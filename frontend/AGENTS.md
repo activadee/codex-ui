@@ -1,0 +1,1 @@
+Use shadcn components only. Discover them by using the shadcn mcp. Install them using the shadcn cli.
