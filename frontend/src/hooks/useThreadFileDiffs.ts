@@ -73,6 +73,8 @@ export function useThreadFileDiffs(threadId?: number): UseThreadFileDiffsRespons
         return
       }
       setFiles(payload.files ?? [])
+      setError(null)
+      setIsLoading(false)
     }
     listenerRef.current = EventsOn(topic, handleEvent)
     return () => {
