@@ -1,6 +1,17 @@
-import { useRef, type ChangeEvent, type ClipboardEvent } from "react"
+import { useMemo, useRef, useState, type ChangeEvent, type ClipboardEvent } from "react"
 
-import { FileText, Image, Paperclip, SendHorizonal, Square, X } from "lucide-react"
+import {
+  CheckCircle2,
+  ChevronDown,
+  ChevronRight,
+  FileText,
+  Image,
+  ListChecks,
+  Paperclip,
+  SendHorizonal,
+  Square,
+  X
+} from "lucide-react"
 
 import { Textarea } from "@/components/ui/textarea"
 import { Button } from "@/components/ui/button"
@@ -31,6 +42,7 @@ type ComposerPanelProps = {
   usage?: AgentUsage | null
   status?: string
   errorMessage?: string | null
+  todoList?: { items: Array<{ text: string; completed: boolean }> } | null
 }
 
 export function ComposerPanel({
@@ -55,7 +67,8 @@ export function ComposerPanel({
   onSandboxChange,
   usage,
   status,
-  errorMessage
+  errorMessage,
+  todoList
 }: ComposerPanelProps) {
   const actionDisabled = !canSend || isStreaming
   const fileInputRef = useRef<HTMLInputElement | null>(null)
@@ -87,6 +100,10 @@ export function ComposerPanel({
 
   return (
     <div className="px-8 py-6">
+      {/** Sticky todo dock shown above the input */}
+      {Boolean(todolistHasItems(todoList)) && (
+        <TodoDock todoList={todoList!} />
+      )}
       <div className="flex flex-wrap items-center gap-3 pb-4">
         <ControlSelect
           label="Model"
@@ -201,6 +218,82 @@ export function ComposerPanel({
           </div>
         </div>
       </div>
+    </div>
+  )
+}
+
+function todolistHasItems(todoList?: { items: Array<{ text: string; completed: boolean }> } | null): boolean {
+  return Boolean(todoList && Array.isArray(todoList.items) && todoList.items.length > 0)
+}
+
+function TodoDock({
+  todoList
+}: {
+  todoList: { items: Array<{ text: string; completed: boolean }> }
+}) {
+  const [open, setOpen] = useState(false)
+  const items = todoList.items
+
+  const { total, done, left, activeIndex } = useMemo(() => {
+    const total = items.length
+    const done = items.filter((t) => t.completed).length
+    const left = total - done
+    const activeIndex = items.findIndex((t) => !t.completed)
+    return { total, done, left, activeIndex }
+  }, [items])
+
+  return (
+    <div className="mb-4 rounded-xl border border-primary/30 bg-primary/5">
+      <button
+        type="button"
+        className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left text-sm text-foreground"
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+      >
+        <span className="flex min-w-0 items-center gap-2 font-medium">
+          <ListChecks className="h-4 w-4 text-primary" />
+          <span className="truncate">To-dos</span>
+        </span>
+        <span className="flex shrink-0 items-center gap-4 text-xs text-muted-foreground">
+          <span className="rounded-full bg-primary/10 px-2 py-1 text-primary">{total} total</span>
+          <span className="rounded-full bg-emerald-100/60 px-2 py-1 text-emerald-700">{done} done</span>
+          <span className="rounded-full bg-amber-100/60 px-2 py-1 text-amber-700">{left} left</span>
+          {open ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+        </span>
+      </button>
+      {open && (
+        <ul className="border-t border-primary/20 px-4 py-3 text-sm">
+          {items.map((todo, idx) => {
+            const isActive = !todo.completed && idx === activeIndex
+            return (
+              <li
+                key={`${todo.text}-${idx}`}
+                className="flex min-w-0 items-center gap-2 py-1"
+              >
+                <CheckCircle2
+                  className={
+                    todo.completed ? "h-4 w-4 text-primary" : isActive ? "h-4 w-4 text-amber-600" : "h-4 w-4 text-muted-foreground/60"
+                  }
+                />
+                <span
+                  className={
+                    todo.completed
+                      ? "break-words line-through text-muted-foreground"
+                      : "break-words text-foreground"
+                  }
+                >
+                  {todo.text}
+                </span>
+                {isActive && (
+                  <span className="ml-auto inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-medium uppercase tracking-wide text-amber-700">
+                    Active
+                  </span>
+                )}
+              </li>
+            )
+          })}
+        </ul>
+      )}
     </div>
   )
 }
