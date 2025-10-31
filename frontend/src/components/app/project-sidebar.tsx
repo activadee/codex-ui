@@ -199,7 +199,7 @@ function StatusPill({ status }: { status: ThreadListItem["status"] }) {
     stopped: "bg-amber-500",
     failed: "bg-rose-500"
   }
-  return <span className={cn("h-2.5 w-2.5 flex-shrink-0 rounded-full", colorMap[status] ?? "bg-muted-foreground")}></span>
+  return <span className={cn("h-2.5 w-2.5 shrink-0 rounded-full", colorMap[status] ?? "bg-muted-foreground")}></span>
 }
 
 type ThreadListItemRowProps = {

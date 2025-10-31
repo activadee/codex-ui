@@ -91,7 +91,7 @@ function UserEntryCard({ entry }: { entry: UserConversationEntry }) {
         <time className="shrink-0 text-[11px] tracking-wide text-muted-foreground/80">{timestamp}</time>
       </header>
       <div className="mt-3 max-w-full space-y-3 text-sm text-foreground">
-        {entry.text && <p className="whitespace-pre-wrap break-words leading-relaxed">{entry.text}</p>}
+        {entry.text && <p className="whitespace-pre-wrap wrap-break-word leading-relaxed">{entry.text}</p>}
       </div>
     </article>
   )
@@ -134,7 +134,7 @@ function SystemEntryCard({ entry }: { entry: SystemConversationEntry }) {
     >
       <span className="flex min-w-0 flex-1 items-center gap-2">
         {isError ? <AlertTriangle className="h-3.5 w-3.5" aria-hidden /> : <Sparkles className="h-3.5 w-3.5" aria-hidden />}
-        <span className="break-words">{entry.message}</span>
+        <span className="wrap-break-word">{entry.message}</span>
       </span>
       <time className="shrink-0 text-[11px] tracking-wide text-muted-foreground/80">{timestamp}</time>
     </div>
@@ -146,7 +146,7 @@ function StreamingIndicator({ status }: { status: string }) {
   return (
     <div className="flex min-w-0 w-full max-w-full items-center gap-3 overflow-hidden rounded-xl border border-primary/20 bg-primary/10 px-4 py-3 text-xs font-medium text-primary">
       <Loader2 className="h-4 w-4 animate-spin" />
-      <span className="break-words">{label}</span>
+      <span className="wrap-break-word">{label}</span>
     </div>
   )
 }
@@ -155,7 +155,7 @@ function renderAgentContent(item: AgentConversationEntry["item"]) {
   switch (item.type) {
     case "agent_message":
       if (item.text) {
-        return <p className="whitespace-pre-wrap break-words leading-relaxed">{item.text}</p>
+        return <p className="whitespace-pre-wrap wrap-break-word leading-relaxed">{item.text}</p>
       }
       return null
     case "reasoning":
@@ -165,7 +165,7 @@ function renderAgentContent(item: AgentConversationEntry["item"]) {
       return (
         <div className="max-w-full rounded-lg border border-primary/30 bg-white/70 px-4 py-3 text-xs text-muted-foreground">
           {item.reasoning.split("\n").map((line, idx) => (
-            <p key={idx} className="break-words">
+            <p key={idx} className="wrap-break-word">
               {line}
             </p>
           ))}
@@ -230,7 +230,7 @@ function renderAgentContent(item: AgentConversationEntry["item"]) {
       return (
         <div className="flex min-w-0 max-w-full items-center gap-2 text-xs text-foreground">
           <Search className="h-3.5 w-3.5" />
-          <span className="break-words">{item.webSearch.query}</span>
+          <span className="wrap-break-word">{item.webSearch.query}</span>
         </div>
       )
     case "todo_list":
@@ -242,7 +242,7 @@ function renderAgentContent(item: AgentConversationEntry["item"]) {
           {item.todoList.items.map((todo, idx) => (
             <li key={`${todo.text}-${idx}`} className="flex min-w-0 items-center gap-2">
               <CheckCircle2 className={cn("h-3.5 w-3.5", todo.completed ? "text-primary" : "text-muted-foreground/60")} />
-              <span className={cn("break-words", todo.completed ? "line-through text-muted-foreground" : undefined)}>{todo.text}</span>
+              <span className={cn("wrap-break-word", todo.completed ? "line-through text-muted-foreground" : undefined)}>{todo.text}</span>
             </li>
           ))}
         </ul>
@@ -254,7 +254,7 @@ function renderAgentContent(item: AgentConversationEntry["item"]) {
       return (
         <div className="flex min-w-0 items-center gap-2 rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive max-w-full">
           <AlertTriangle className="h-3.5 w-3.5" />
-          <span className="break-words">{item.error.message}</span>
+          <span className="wrap-break-word">{item.error.message}</span>
         </div>
       )
     default:
