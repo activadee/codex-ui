@@ -114,17 +114,51 @@ export function useThreadTerminal(threadId?: number): UseThreadTerminalResponse 
 
   useEffect(() => {
     activeThreadRef.current = threadId
+    if (listenerIdRef.current) {
+      listenerIdRef.current()
+      listenerIdRef.current = null
+    }
     if (!threadId) {
       setStatus("idle")
       setExitStatus(null)
       setError(null)
       return
     }
+    const topic = terminalTopic(threadId)
+    const handleEvent = (payload: TerminalWireEvent) => {
+      if (!payload || payload.threadId !== activeThreadRef.current) {
+        return
+      }
+      switch (payload.type) {
+        case "ready":
+          setStatus("ready")
+          broadcast({ type: "ready" })
+          break
+        case "output":
+          if (!payload.data) {
+            return
+          }
+          broadcast({ type: "output", data: decodeBase64(payload.data) })
+          break
+        case "exit":
+          setStatus("exited")
+          setExitStatus(payload.status ?? null)
+          broadcast({ type: "exit", status: payload.status })
+          break
+        default:
+          break
+      }
+    }
+    listenerIdRef.current = EventsOn(topic, handleEvent)
     void start()
     return () => {
+      if (listenerIdRef.current) {
+        listenerIdRef.current()
+        listenerIdRef.current = null
+      }
       void StopThreadTerminal(threadId)
     }
-  }, [start, threadId])
+  }, [broadcast, start, threadId])
 
   useEffect(() => {
     if (!threadId) {
