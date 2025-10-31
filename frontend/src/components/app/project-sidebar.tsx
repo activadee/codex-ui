@@ -261,7 +261,7 @@ function ThreadListItemRow({ thread, isActive, onSelect, onRename, onDelete }: T
               className={cn(
                 "grid w-full grid-cols-[minmax(0,1fr)_auto] items-center gap-2.5 overflow-hidden rounded-md border px-3 py-2 text-left transition",
                 isActive
-                  ? "border-primary/60 bg-primary/[0.08] shadow-sm"
+                  ? "border-primary/60 bg-primary/8 shadow-sm"
                   : "border-border/60 bg-card hover:bg-muted/70"
               )}
             >
@@ -420,7 +420,7 @@ function ProjectListItemRow({ project, isActive, onSelect, onDelete }: ProjectLi
             className={cn(
               "w-full rounded-md border px-3 py-2 text-left transition",
               isActive
-                ? "border-primary/60 bg-primary/[0.08] shadow-sm"
+                ? "border-primary/60 bg-primary/8 shadow-sm"
                 : "border-border/60 bg-card hover:bg-muted/70"
             )}
           >
