@@ -313,7 +313,6 @@ function App() {
           return { items }
         }
       }
-    }
     return null
   }, [conversation.list])
 
