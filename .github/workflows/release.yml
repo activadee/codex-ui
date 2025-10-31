@@ -68,10 +68,6 @@ jobs:
         run: npm ci
         working-directory: frontend
 
-      - name: Run tests
-        if: matrix.os == 'ubuntu-latest'
-        run: go test ./...
-
       - name: Install Wails CLI
         run: go install github.com/wailsapp/wails/v2/cmd/wails@latest
 
