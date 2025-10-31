@@ -110,21 +110,21 @@ export function ComposerPanel({
           value={model.value}
           options={modelOptions}
           onValueChange={onModelChange}
-          className="min-w-[8rem]"
+          className="min-w-32"
         />
         <ControlSelect
           label="Reasoning"
           value={reasoning.value}
           options={reasoningOptions}
           onValueChange={onReasoningChange}
-          className="min-w-[7rem]"
+          className="min-w-28"
         />
         <ControlSelect
           label="Sandbox"
           value={sandbox.value}
           options={sandboxOptions}
           onValueChange={onSandboxChange}
-          className="min-w-[9rem]"
+          className="min-w-36"
         />
       </div>
 
@@ -278,8 +278,8 @@ function TodoDock({
                 <span
                   className={
                     todo.completed
-                      ? "break-words line-through text-muted-foreground"
-                      : "break-words text-foreground"
+                      ? "wrap-break-word line-through text-muted-foreground"
+                      : "wrap-break-word text-foreground"
                   }
                 >
                   {todo.text}

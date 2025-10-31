@@ -27,7 +27,7 @@ export function ControlSelect({
     <Select value={value} onValueChange={onValueChange}>
       <SelectTrigger
         className={cn(
-          "flex w-auto min-w-[9rem] items-center justify-between rounded-full border border-border bg-white px-3 py-1.5 text-sm font-medium text-foreground shadow-sm hover:bg-secondary",
+          "flex w-auto min-w-36 items-center justify-between rounded-full border border-border bg-white px-3 py-1.5 text-sm font-medium text-foreground shadow-sm hover:bg-secondary",
           className
         )}
       >
