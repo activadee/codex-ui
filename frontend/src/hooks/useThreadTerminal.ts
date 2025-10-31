@@ -62,6 +62,10 @@ export function useThreadTerminal(threadId?: number): UseThreadTerminalResponse 
     setError(null)
     try {
       await StartThreadTerminal(currentThreadId)
+      if (activeThreadRef.current === currentThreadId) {
+        setStatus("ready")
+        broadcast({ type: "ready" })
+      }
     } catch (err) {
       if (activeThreadRef.current !== currentThreadId) {
         return
@@ -70,7 +74,7 @@ export function useThreadTerminal(threadId?: number): UseThreadTerminalResponse 
       setError(message)
       setStatus("error")
     }
-  }, [threadId])
+  }, [broadcast, threadId])
 
   const stop = useCallback(async () => {
     if (!threadId) {
