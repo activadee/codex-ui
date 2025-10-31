@@ -91,7 +91,7 @@ function UserEntryCard({ entry }: { entry: UserConversationEntry }) {
         <time className="shrink-0 text-[11px] tracking-wide text-muted-foreground/80">{timestamp}</time>
       </header>
       <div className="mt-3 max-w-full space-y-3 text-sm text-foreground">
-        {entry.text && <p className="whitespace-pre-wrap wrap-break-word leading-relaxed">{entry.text}</p>}
+        {entry.text && <p className="whitespace-pre-wrap break-words leading-relaxed">{entry.text}</p>}
       </div>
     </article>
   )
