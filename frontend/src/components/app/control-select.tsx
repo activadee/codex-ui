@@ -27,7 +27,7 @@ export function ControlSelect({
 }: ControlSelectProps) {
   const triggerBase =
     variant === "inline"
-      ? "flex w-auto min-w-0 items-center gap-1 justify-between rounded-none border-none bg-transparent px-0 py-0 h-6 text-xs font-medium text-foreground shadow-none focus:outline-none focus:ring-0 hover:bg-transparent [&_svg]:!h-3 [&_svg]:!w-3"
+      ? "flex w-auto min-w-0 items-center gap-1 justify-between rounded-none border-none bg-transparent px-0 py-0 h-6 text-xs font-medium text-foreground shadow-none hover:bg-transparent [&_svg]:!h-3 [&_svg]:!w-3"
       : "flex w-auto min-w-36 items-center justify-between rounded-full border border-border bg-white px-3 py-1.5 text-sm font-medium text-foreground shadow-sm hover:bg-secondary"
 
   return (
