@@ -14,6 +14,7 @@ type ControlSelectProps = {
   options: SelectOption[]
   onValueChange: (value: string) => void
   className?: string
+  variant?: "default" | "inline"
 }
 
 export function ControlSelect({
@@ -21,15 +22,18 @@ export function ControlSelect({
   value,
   options,
   onValueChange,
-  className
+  className,
+  variant = "default"
 }: ControlSelectProps) {
+  const triggerBase =
+    variant === "inline"
+      ? "flex w-auto min-w-0 items-center gap-1 justify-between rounded-none border-none bg-transparent px-0 py-0 h-6 text-xs font-medium text-foreground shadow-none hover:bg-transparent [&_svg]:!h-3 [&_svg]:!w-3"
+      : "flex w-auto min-w-36 items-center justify-between rounded-full border border-border bg-white px-3 py-1.5 text-sm font-medium text-foreground shadow-sm hover:bg-secondary"
+
   return (
     <Select value={value} onValueChange={onValueChange}>
       <SelectTrigger
-        className={cn(
-          "flex w-auto min-w-36 items-center justify-between rounded-full border border-border bg-white px-3 py-1.5 text-sm font-medium text-foreground shadow-sm hover:bg-secondary",
-          className
-        )}
+        className={cn(triggerBase, className)}
       >
         <SelectValue placeholder={label ?? "Select an option"} />
       </SelectTrigger>
@@ -43,4 +47,3 @@ export function ControlSelect({
     </Select>
   )
 }
-

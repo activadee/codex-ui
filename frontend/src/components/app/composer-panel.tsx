@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState, type ChangeEvent, type ClipboardEvent } from "react"
+import { useEffect, useMemo, useRef, useState, type ChangeEvent, type ClipboardEvent } from "react"
 
 import {
   CheckCircle2,
@@ -72,6 +72,22 @@ export function ComposerPanel({
 }: ComposerPanelProps) {
   const actionDisabled = !canSend || isStreaming
   const fileInputRef = useRef<HTMLInputElement | null>(null)
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null)
+  const overlayBarRef = useRef<HTMLDivElement | null>(null)
+  const [overlayHeight, setOverlayHeight] = useState<number>(44)
+
+  // Input should not grow: no auto-resize; scrolling inside textarea instead.
+
+  // Measure overlay height to reserve space inside the wrapper
+  useEffect(() => {
+    const fn = () => {
+      const h = overlayBarRef.current?.offsetHeight ?? 40
+      setOverlayHeight(h)
+    }
+    fn()
+    window.addEventListener("resize", fn)
+    return () => window.removeEventListener("resize", fn)
+  }, [isStreaming])
 
   const handlePaste = (event: ClipboardEvent<HTMLTextAreaElement>) => {
     const items = Array.from(event.clipboardData?.items ?? [])
@@ -104,39 +120,89 @@ export function ComposerPanel({
       {Boolean(todolistHasItems(todoList)) && (
         <TodoDock todoList={todoList!} />
       )}
-      <div className="flex flex-wrap items-center gap-3 pb-4">
-        <ControlSelect
-          label="Model"
-          value={model.value}
-          options={modelOptions}
-          onValueChange={onModelChange}
-          className="min-w-32"
-        />
-        <ControlSelect
-          label="Reasoning"
-          value={reasoning.value}
-          options={reasoningOptions}
-          onValueChange={onReasoningChange}
-          className="min-w-28"
-        />
-        <ControlSelect
-          label="Sandbox"
-          value={sandbox.value}
-          options={sandboxOptions}
-          onValueChange={onSandboxChange}
-          className="min-w-36"
-        />
-      </div>
-
       <div className="flex flex-col gap-3">
-        <Textarea
-          value={prompt}
-          onChange={(event) => onPromptChange(event.target.value)}
-          onPaste={handlePaste}
-          rows={3}
-          placeholder={`Add a follow-up for ${projectName}`}
-          className="min-h-[88px] resize-none rounded-2xl border border-border bg-white text-base text-foreground shadow-sm focus-visible:ring-2 focus-visible:ring-primary"
-        />
+        <div
+          className="relative h-36 rounded-2xl border border-border bg-white text-base text-foreground shadow-sm focus-within:ring-2 focus-within:ring-primary"
+          style={{ paddingBottom: overlayHeight + 12 }}
+        >
+          <Textarea
+            value={prompt}
+            onChange={(event) => onPromptChange(event.target.value)}
+            onPaste={handlePaste}
+            rows={3}
+            placeholder={`Add a follow-up for ${projectName}`}
+            ref={textareaRef}
+            className="h-full min-h-0 overflow-y-auto resize-none border-0 bg-transparent px-4 py-3 text-base shadow-none focus-visible:ring-0"
+          />
+
+          {/** Bottom bar inside the input wrapper: selects on left, actions on right */}
+          <div
+            ref={overlayBarRef}
+            className="pointer-events-none absolute inset-x-3 bottom-3 z-10 flex items-center justify-between"
+          >
+            <div className="pointer-events-auto flex items-center gap-3 text-muted-foreground">
+              <ControlSelect
+                label="Model"
+                value={model.value}
+                options={modelOptions}
+                onValueChange={onModelChange}
+                variant="inline"
+              />
+              <ControlSelect
+                label="Reasoning"
+                value={reasoning.value}
+                options={reasoningOptions}
+                onValueChange={onReasoningChange}
+                variant="inline"
+              />
+              <ControlSelect
+                label="Sandbox"
+                value={sandbox.value}
+                options={sandboxOptions}
+                onValueChange={onSandboxChange}
+                variant="inline"
+              />
+            </div>
+            <div className="pointer-events-auto flex items-center gap-2">
+              <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full" title="Attach file">
+                <Paperclip className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 rounded-full"
+                title="Insert image"
+                onClick={() => fileInputRef.current?.click()}
+              >
+                <Image className="h-4 w-4" />
+              </Button>
+              <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full" title="Add snippet">
+                <FileText className="h-4 w-4" />
+              </Button>
+              {isStreaming && (
+                <Button
+                  type="button"
+                  onClick={onStop}
+                  variant="secondary"
+                  className="rounded-full px-4 h-9"
+                >
+                  <Square className="h-4 w-4" />
+                  Stop
+                </Button>
+              )}
+              <Button
+                type="button"
+                onClick={onSend}
+                disabled={actionDisabled}
+                className="rounded-full px-5 h-9"
+                title="Send"
+              >
+                <SendHorizonal className="mr-2 h-4 w-4" />
+                Send
+              </Button>
+            </div>
+          </div>
+        </div>
         <input
           ref={fileInputRef}
           type="file"
@@ -176,47 +242,7 @@ export function ComposerPanel({
             {errorMessage}
           </p>
         )}
-        <div className="flex flex-wrap items-center justify-between gap-3 text-xs text-muted-foreground">
-          <div className="flex items-center gap-2">
-            <Button variant="ghost" size="icon" className="h-9 w-9 rounded-full" title="Attach file">
-              <Paperclip className="h-4 w-4" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-9 w-9 rounded-full"
-              title="Insert image"
-              onClick={() => fileInputRef.current?.click()}
-            >
-              <Image className="h-4 w-4" />
-            </Button>
-            <Button variant="ghost" size="icon" className="h-9 w-9 rounded-full" title="Add snippet">
-              <FileText className="h-4 w-4" />
-            </Button>
-          </div>
-          <div className="flex items-center gap-3">
-            {isStreaming && (
-              <Button
-                type="button"
-                onClick={onStop}
-                variant="secondary"
-                className="rounded-full px-5"
-              >
-                <Square className="h-4 w-4" />
-                Stop
-              </Button>
-            )}
-            <Button
-              type="button"
-              onClick={onSend}
-              disabled={actionDisabled}
-              className="rounded-full px-6"
-            >
-              <SendHorizonal className="mr-2 h-4 w-4" />
-              Send
-            </Button>
-          </div>
-        </div>
+        {/** bottom toolbar moved inside the textarea overlay */}
       </div>
     </div>
   )
