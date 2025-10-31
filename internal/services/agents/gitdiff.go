@@ -30,8 +30,18 @@ func collectGitDiffStats(ctx context.Context, root string) ([]FileDiffStatDTO, e
 	}
 	numstat := make(map[string][2]int)
 
-	if err := accumulateNumstat(ctx, root, []string{"diff", "--numstat"}, numstat); err != nil {
-		return nil, err
+	if err := accumulateNumstat(ctx, root, []string{"diff", "--numstat", "HEAD"}, numstat); err != nil {
+		emptyTreeHash, hashErr := runGitCommand(ctx, root, "hash-object", "-w", "-t", "tree", "/dev/null")
+		if hashErr != nil {
+			return nil, fmt.Errorf("resolve empty tree hash: %w", hashErr)
+		}
+		emptyTreeHash = strings.TrimSpace(emptyTreeHash)
+		if emptyTreeHash == "" {
+			return nil, fmt.Errorf("resolve empty tree hash: %w", err)
+		}
+		if err := accumulateNumstat(ctx, root, []string{"diff", "--numstat", emptyTreeHash}, numstat); err != nil {
+			return nil, err
+		}
 	}
 	if err := accumulateNumstat(ctx, root, []string{"diff", "--numstat", "--cached"}, numstat); err != nil {
 		return nil, err
