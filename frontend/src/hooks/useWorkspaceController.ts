@@ -29,6 +29,8 @@ type SendMessageOptions = {
 
 type ConversationMap = Record<number, ConversationEntry[]>
 
+type StreamErrorMap = Partial<Record<number, string>> & { global?: string }
+
 export function useWorkspaceController() {
   const {
     projects,
@@ -40,8 +42,31 @@ export function useWorkspaceController() {
     deleteProject
   } = useProjects()
 
-  const [streamError, setStreamError] = useState<string | null>(null)
+  const [streamErrors, setStreamErrors] = useState<StreamErrorMap>({})
   const pendingAttachmentsRef = useRef<Map<string, string[]>>(new Map())
+
+  const updateStreamError = useCallback((message: string | null, threadId?: number) => {
+    const key = typeof threadId === "number" ? threadId : "global"
+    setStreamErrors((prev) => {
+      const next: StreamErrorMap = { ...prev }
+      if (!message) {
+        if (key === "global") {
+          if (!("global" in next)) {
+            return prev
+          }
+          delete next.global
+          return next
+        }
+        if (!(key in next)) {
+          return prev
+        }
+        delete next[key]
+        return next
+      }
+      next[key] = message
+      return next
+    })
+  }, [])
 
   const [conversationMap, setConversationMap] = useState<ConversationMap>({})
   const conversationRef = useRef<ConversationMap>({})
@@ -275,7 +300,8 @@ export function useWorkspaceController() {
     return conversationMap[threadId] ?? []
   }, [conversationMap, threadId])
 
-  const { startStream, cancelStream, isStreaming, status, usage, threadId: streamThreadId } = useAgentStream({
+
+  const { startStream, cancelStream, getThreadState } = useAgentStream({
     onEvent: (event, context) => {
       const targetThreadId = context.threadId ?? threadId ?? undefined
       if (!targetThreadId) {
@@ -337,7 +363,7 @@ export function useWorkspaceController() {
         }
       }
 
-      setStreamError(null)
+      updateStreamError(null, threadIdFromStream)
       const record = await refreshThread(threadIdFromStream)
       const listItem = threadToListItem(record)
       setActiveThread(listItem)
@@ -355,21 +381,27 @@ export function useWorkspaceController() {
         appendSystemEntry(threadIdFromStream, entry)
       }
     },
-    onError: (message) => {
-      setStreamError(message)
+    onError: (message, context) => {
+      updateStreamError(message, context.threadId)
     }
   })
+
+  const threadStreamState = useMemo(
+    () => getThreadState(threadId ?? undefined),
+    [getThreadState, threadId]
+  )
+  const isThreadStreaming = threadStreamState.status === "streaming"
 
   useEffect(() => {
     if (!threadId) {
       return
     }
     ensureTimeline(threadId)
-    if (isStreaming && streamThreadId === threadId) {
+    if (isThreadStreaming) {
       return
     }
     void loadConversation(threadId)
-  }, [ensureTimeline, isStreaming, loadConversation, streamThreadId, threadId])
+  }, [ensureTimeline, isThreadStreaming, loadConversation, threadId])
 
   const handleThreadSelect = useCallback(
     (thread: ThreadListItem) => {
@@ -380,8 +412,8 @@ export function useWorkspaceController() {
 
   const handleNewThread = useCallback(() => {
     setActiveThread(null)
-    setStreamError(null)
-  }, [])
+    updateStreamError(null)
+  }, [updateStreamError])
 
   const sendMessage = useCallback(
     async ({ content, model, sandbox, reasoning, segments, attachmentPaths }: SendMessageOptions) => {
@@ -417,7 +449,7 @@ export function useWorkspaceController() {
         return
       }
 
-      setStreamError(null)
+      updateStreamError(null, activeThread?.id ?? undefined)
 
       const existingThread = activeThread
         ? threads.find((thread) => thread.id === activeThread.id)
@@ -467,7 +499,8 @@ export function useWorkspaceController() {
       refreshThread,
       startStream,
       syncThreadPreviewFromConversation,
-      threads
+      threads,
+      updateStreamError
     ]
   )
 
@@ -542,12 +575,29 @@ export function useWorkspaceController() {
           }
           return prev
         })
+        updateStreamError(null, thread.id)
       } catch (error) {
         throw error
       }
     },
-    [setActiveThread, setThreads, updateConversationMap]
+    [setActiveThread, setThreads, updateConversationMap, updateStreamError]
   )
+
+  const streamStatus = threadStreamState.status
+  const streamUsage = threadStreamState.usage
+  const stateError = threadStreamState.error ?? null
+  const manualThreadError = threadId ? streamErrors[threadId] ?? null : null
+  const globalError = streamErrors.global ?? null
+  const activeStreamError = manualThreadError ?? stateError ?? globalError ?? null
+
+  const setCurrentStreamError = useCallback(
+    (message: string | null) => {
+      updateStreamError(message, threadId ?? undefined)
+    },
+    [threadId, updateStreamError]
+  )
+
+  const cancelCurrentStream = useCallback(() => cancelStream(threadId ?? undefined), [cancelStream, threadId])
 
   return {
     projects: {
@@ -574,13 +624,13 @@ export function useWorkspaceController() {
       list: conversation
     },
     stream: {
-      isStreaming,
-      status,
-      usage,
-      error: streamError,
-      setError: setStreamError,
+      isStreaming: isThreadStreaming,
+      status: streamStatus,
+      usage: streamUsage,
+      error: activeStreamError,
+      setError: setCurrentStreamError,
       send: sendMessage,
-      cancel: cancelStream
+      cancel: cancelCurrentStream
     },
     selection: {
       thread: selectedThread
