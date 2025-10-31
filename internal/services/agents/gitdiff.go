@@ -79,13 +79,19 @@ func parseGitStatus(ctx context.Context, root string) (map[string]string, error)
 			continue
 		}
 		code := strings.TrimSpace(line[:2])
-		path := strings.TrimSpace(line[3:])
-		if code == "" || path == "" {
+		rawPath := strings.TrimSpace(line[3:])
+		if code == "" || rawPath == "" {
 			continue
 		}
-		if strings.Contains(path, " -> ") {
-			parts := strings.Split(path, " -> ")
-			path = parts[len(parts)-1]
+		if strings.Contains(rawPath, " -> ") {
+			parts := strings.Split(rawPath, " -> ")
+			rawPath = parts[len(parts)-1]
+		}
+		path := strings.TrimSpace(rawPath)
+		if strings.HasPrefix(path, "\"") {
+			if decoded, err := strconv.Unquote(path); err == nil {
+				path = decoded
+			}
 		}
 		status[path] = code
 	}
