@@ -56,6 +56,7 @@ jobs:
           go-version: "1.24"
           node-version: "20"
           package: false
+          build-obfuscate: true
           wails-version: "v2.10.2"
 
       - name: Package Linux artifact
@@ -72,7 +73,7 @@ jobs:
         if: matrix.os == 'windows-latest'
         shell: pwsh
         run: |
-          Compress-Archive -Path "build\bin\codex-ui.exe" -DestinationPath "codex-ui-${{ matrix.artifact_suffix }}.zip"
+          Compress-Archive -Path "build\bin\codex-ui" -DestinationPath "codex-ui-${{ matrix.artifact_suffix }}.zip"
 
       - name: Upload Linux artifact
         if: matrix.os == 'ubuntu-latest'
