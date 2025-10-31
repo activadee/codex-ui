@@ -24,15 +24,7 @@ export function useThreadFileDiffs(threadId?: number): UseThreadFileDiffsRespons
   const listenerRef = useRef<(() => void) | null>(null)
   const activeThreadRef = useRef<number | undefined>(threadId)
 
-  const loadFiles = useCallback(async () => {
-    if (!threadId) {
-      setFiles([])
-      setError(null)
-      return
-    }
-    setIsLoading(true)
-    try {
-  const loadFiles = useCallback(async () => {
+ const loadFiles = useCallback(async () => {
     if (!threadId) {
       setFiles([])
       setError(null)
@@ -59,16 +51,6 @@ export function useThreadFileDiffs(threadId?: number): UseThreadFileDiffsRespons
       if (activeThreadRef.current === currentThreadId) {
         setIsLoading(false)
       }
-    }
-  }, [threadId])
-      setFiles(diffs ?? [])
-      setError(null)
-    } catch (err) {
-      const message = err instanceof Error ? err.message : "Failed to load file changes"
-      setError(message)
-      setFiles([])
-    } finally {
-      setIsLoading(false)
     }
   }, [threadId])
 
