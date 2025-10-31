@@ -1,8 +1,7 @@
 import { useEffect, useState, type FormEvent } from "react"
 
+import { WorkspacePanel } from "@/components/app/workspace-panel"
 import { Button } from "@/components/ui/button"
-import { ScrollArea } from "@/components/ui/scroll-area"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import {
   ContextMenu,
   ContextMenuContent,
@@ -31,10 +30,10 @@ type ProjectSidebarProps = {
   onProjectChange: (project: Project) => void
   onProjectDelete: (project: Project) => void
   onAddProject: () => void
+  onNewThread: () => void
   isLoadingProjects?: boolean
   activeThread: ThreadListItem | null
   onThreadSelect: (thread: ThreadListItem) => void
-  onNewThread: () => void
   onThreadRename: (thread: ThreadListItem, title: string) => Promise<void>
   onThreadDelete: (thread: ThreadListItem) => Promise<void>
 }
@@ -53,94 +52,79 @@ export function ProjectSidebar({
   onThreadRename,
   onThreadDelete
 }: ProjectSidebarProps) {
+  const totalThreads = sections.reduce((sum, section) => sum + section.threads.length, 0)
+
   return (
-    <aside className="flex h-screen w-full max-w-[320px] flex-col border-r border-border bg-white">
-      <div className="flex flex-col gap-3 px-4 py-4">
-        <div className="flex items-center justify-between">
-          <span className="text-xs font-semibold uppercase tracking-[0.32em] text-muted-foreground">Agents</span>
-          <Button variant="default" size="sm" onClick={onNewThread}>
-            + New Agent
+    <aside className="flex flex-col h-full w-full max-w-[288px] border-r border-border/70 bg-white">
+      <WorkspacePanel
+        title="Projects"
+        className="flex h-1/2 flex-col"
+        actions={
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-7 gap-2"
+            onClick={onAddProject}
+            disabled={isLoadingProjects}
+          >
+            <Plus className="h-4 w-4" />
+            Add
           </Button>
-        </div>
-        <ProjectPicker
+        }
+        bodyClassName="flex h-full min-h-0 flex-col gap-3 px-3 py-3"
+      >
+        <ProjectList
           projects={projects}
           activeProject={activeProject}
-          onChange={onProjectChange}
+          onSelect={onProjectChange}
+          onDelete={onProjectDelete}
         />
-      </div>
-      <ScrollArea className="flex-1 px-4 py-6">
+        {activeProject && (
+          <div className="rounded-md border border-border/60 bg-background/70 px-3 py-2 text-xs text-muted-foreground">
+            <p className="text-sm font-semibold text-foreground">{activeProject.name}</p>
+            <p className="mt-1">Tracked threads · {totalThreads}</p>
+          </div>
+        )}
+      </WorkspacePanel>
+      <WorkspacePanel
+        title="Threads"
+        className="flex h-1/2 flex-col"
+        actions={
+          <Button variant="default" size="sm" className="h-7 rounded-md px-3" onClick={onNewThread}>
+            New
+          </Button>
+        }
+        bodyClassName="flex h-full min-h-0 flex-col px-3 py-3"
+      >
         {sections.length > 0 && activeProject ? (
-          <div className="space-y-8">
-            {sections.map((section) => (
-              <ThreadSectionList
-                key={section.label}
-                section={section}
-                activeThread={activeThread}
-                onThreadSelect={onThreadSelect}
-                onThreadRename={onThreadRename}
-                onThreadDelete={onThreadDelete}
-              />
-            ))}
+          <div className="flex-1 min-h-0 overflow-y-auto pr-1">
+            <div className="space-y-4">
+              {sections.map((section) => (
+                <ThreadSectionList
+                  key={section.label}
+                  section={section}
+                  activeThread={activeThread}
+                  onThreadSelect={onThreadSelect}
+                  onThreadRename={onThreadRename}
+                  onThreadDelete={onThreadDelete}
+                />
+              ))}
+            </div>
           </div>
         ) : (
-          <div className="flex h-full min-h-[240px] flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-border/80 bg-muted/40 text-center">
+          <div className="flex flex-1 min-h-[200px] flex-col items-center justify-center gap-2.5 rounded-lg border border-dashed border-border/70 bg-muted/40 px-4 text-center">
             <p className="text-sm font-medium text-foreground">
               {activeProject ? "No conversations yet" : "Select a project"}
             </p>
-            <p className="max-w-[220px] text-xs text-muted-foreground">
+            <p className="text-xs text-muted-foreground">
               {activeProject
                 ? "Once Codex ingests sessions for this workspace, they’ll show up here."
-                : "Pick a project from the menu or add a new one to start tracking conversations."}
+                : "Pick a project or add a new one to start tracking conversations."}
             </p>
           </div>
         )}
-      </ScrollArea>
-      <div className="border-t border-border p-4">
-        <Button
-          variant="outline"
-          className="w-full justify-center gap-2 rounded-2xl"
-          onClick={onAddProject}
-          disabled={isLoadingProjects}
-        >
-          <Plus className="h-4 w-4" />
-          Add project
-        </Button>
-      </div>
+      </WorkspacePanel>
     </aside>
-  )
-}
-
-type ProjectPickerProps = {
-  activeProject: Project | null
-  projects: Project[]
-  onChange: (project: Project) => void
-}
-
-function ProjectPicker({ activeProject, projects, onChange }: ProjectPickerProps) {
-  const hasProjects = projects.length > 0
-  const placeholder = hasProjects ? "Select project" : "No projects available"
-  return (
-    <Select
-      value={activeProject ? String(activeProject.id) : undefined}
-      onValueChange={(value) => {
-        const selected = projects.find((project) => String(project.id) === value)
-        if (selected) {
-          onChange(selected)
-        }
-      }}
-      disabled={!hasProjects}
-    >
-      <SelectTrigger className="border border-border bg-white px-3 py-2 text-left text-sm text-foreground">
-        <SelectValue placeholder={placeholder} />
-      </SelectTrigger>
-      <SelectContent>
-        {projects.map((project) => (
-          <SelectItem key={project.id} value={String(project.id)}>
-            {project.name}
-          </SelectItem>
-        ))}
-      </SelectContent>
-    </Select>
   )
 }
 
@@ -161,19 +145,19 @@ function ThreadSectionList({
 }: ThreadSectionListProps) {
   const icon = getSectionIcon(section.label)
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
       <div className="flex items-center justify-between">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.32em] text-muted-foreground">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-muted-foreground">
             {section.label}
           </p>
           {section.subtitle && (
-            <p className="mt-1 text-xs text-muted-foreground">{section.subtitle}</p>
+            <p className="mt-0.5 text-xs text-muted-foreground">{section.subtitle}</p>
           )}
         </div>
         {icon}
       </div>
-      <div className="space-y-2">
+      <div className="space-y-1.5">
         {section.threads.map((thread) => {
           const isActive = activeThread?.id === thread.id
           return (
@@ -275,10 +259,10 @@ function ThreadListItemRow({ thread, isActive, onSelect, onRename, onDelete }: T
             <button
               onClick={() => onSelect(thread)}
               className={cn(
-                "grid w-full grid-cols-[minmax(0,1fr)_auto] items-center gap-3 overflow-hidden rounded-lg px-3 py-2.5 text-left transition",
+                "grid w-full grid-cols-[minmax(0,1fr)_auto] items-center gap-2.5 overflow-hidden rounded-md border px-3 py-2 text-left transition",
                 isActive
                   ? "border-primary/60 bg-primary/[0.08] shadow-sm"
-                  : "border-border/60 bg-card hover:border-border hover:bg-muted/70"
+                  : "border-border/60 bg-card hover:bg-muted/70"
               )}
             >
               <div className="flex min-w-0 items-center gap-2 text-sm font-medium text-foreground">
@@ -317,22 +301,17 @@ function ThreadListItemRow({ thread, isActive, onSelect, onRename, onDelete }: T
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Rename thread</DialogTitle>
-            <DialogDescription>Choose a new name to help you recognize this conversation.</DialogDescription>
+            <DialogDescription>Give the thread a more descriptive name.</DialogDescription>
           </DialogHeader>
-          <form onSubmit={handleRenameSubmit} className="space-y-4">
-            <Input
-              autoFocus
-              value={renameValue}
-              onChange={(event) => setRenameValue(event.target.value)}
-              placeholder="Thread name"
-            />
-            {renameError && <p className="text-xs text-destructive">{renameError}</p>}
+          <form onSubmit={handleRenameSubmit} className="space-y-3">
+            <Input value={renameValue} onChange={(event) => setRenameValue(event.target.value)} autoFocus />
+            {renameError && <p className="text-sm text-destructive">{renameError}</p>}
             <DialogFooter>
-              <Button variant="outline" type="button" onClick={() => setIsRenameDialogOpen(false)} disabled={isRenaming}>
+              <Button variant="outline" type="button" onClick={() => setIsRenameDialogOpen(false)}>
                 Cancel
               </Button>
               <Button type="submit" disabled={isRenaming}>
-                {isRenaming ? "Saving..." : "Save"}
+                {isRenaming ? "Saving…" : "Save"}
               </Button>
             </DialogFooter>
           </form>
@@ -343,17 +322,15 @@ function ThreadListItemRow({ thread, isActive, onSelect, onRename, onDelete }: T
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Delete thread</DialogTitle>
-            <DialogDescription>
-              This will remove the conversation and its history. This action cannot be undone.
-            </DialogDescription>
+            <DialogDescription>Deleting a thread cannot be undone.</DialogDescription>
           </DialogHeader>
-          {deleteError && <p className="text-xs text-destructive">{deleteError}</p>}
+          {deleteError && <p className="text-sm text-destructive">{deleteError}</p>}
           <DialogFooter>
-            <Button variant="outline" onClick={() => setIsDeleteDialogOpen(false)} disabled={isDeleting}>
+            <Button variant="outline" type="button" onClick={() => setIsDeleteDialogOpen(false)}>
               Cancel
             </Button>
             <Button variant="destructive" onClick={handleDeleteConfirm} disabled={isDeleting}>
-              {isDeleting ? "Deleting..." : "Delete"}
+              {isDeleting ? "Deleting…" : "Delete"}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -363,14 +340,126 @@ function ThreadListItemRow({ thread, isActive, onSelect, onRename, onDelete }: T
 }
 
 function getSectionIcon(label: string) {
-  switch (label) {
-    case "IN PROGRESS":
-      return <Rocket className="h-4 w-4 text-muted-foreground" />
-    case "OLDER":
+  switch (label.toLowerCase()) {
+    case "in progress":
+      return <Rocket className="h-4 w-4 text-primary" />
+    case "archived":
       return <Clock3 className="h-4 w-4 text-muted-foreground" />
-    case "ARCHIVED":
-      return <BadgeCheck className="h-4 w-4 text-muted-foreground" />
+    case "older":
+      return <BadgeCheck className="h-4 w-4 text-emerald-500" />
     default:
-      return <Flame className="h-4 w-4 text-muted-foreground" />
+      return <Flame className="h-4 w-4 text-amber-500" />
   }
+}
+
+type ProjectListProps = {
+  projects: Project[]
+  activeProject: Project | null
+  onSelect: (project: Project) => void
+  onDelete: (project: Project) => void
+}
+
+function ProjectList({ projects, activeProject, onSelect, onDelete }: ProjectListProps) {
+  if (projects.length === 0) {
+    return (
+      <div className="flex h-full min-h-[120px] items-center justify-center rounded-lg border border-dashed border-border/60 bg-muted/40 px-3 text-center text-xs text-muted-foreground">
+        Add a project to get started.
+      </div>
+    )
+  }
+
+  return (
+    <div className="flex-1 min-h-0 overflow-y-auto pr-1">
+      <div className="space-y-1.5">
+        {projects.map((project) => (
+          <ProjectListItemRow
+            key={project.id}
+            project={project}
+            isActive={activeProject?.id === project.id}
+            onSelect={onSelect}
+            onDelete={onDelete}
+          />
+        ))}
+      </div>
+    </div>
+  )
+}
+
+type ProjectListItemRowProps = {
+  project: Project
+  isActive: boolean
+  onSelect: (project: Project) => void
+  onDelete: (project: Project) => void
+}
+
+function ProjectListItemRow({ project, isActive, onSelect, onDelete }: ProjectListItemRowProps) {
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
+  const [deleteError, setDeleteError] = useState<string | null>(null)
+  const [isDeleting, setIsDeleting] = useState(false)
+
+  const handleDelete = async () => {
+    setIsDeleting(true)
+    try {
+      await onDelete(project)
+      setIsDeleteDialogOpen(false)
+      setDeleteError(null)
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to delete project."
+      setDeleteError(message)
+    } finally {
+      setIsDeleting(false)
+    }
+  }
+
+  return (
+    <>
+      <ContextMenu>
+        <ContextMenuTrigger asChild>
+          <button
+            onClick={() => onSelect(project)}
+            className={cn(
+              "w-full rounded-md border px-3 py-2 text-left transition",
+              isActive
+                ? "border-primary/60 bg-primary/[0.08] shadow-sm"
+                : "border-border/60 bg-card hover:bg-muted/70"
+            )}
+          >
+            <p className="truncate text-sm font-medium text-foreground">{project.name}</p>
+            <p className="truncate text-[11px] text-muted-foreground">{project.path}</p>
+          </button>
+        </ContextMenuTrigger>
+        <ContextMenuContent className="w-40">
+          <ContextMenuItem
+            className="text-destructive focus:bg-destructive/10 focus:text-destructive"
+            onSelect={(event) => {
+              event.preventDefault()
+              setIsDeleteDialogOpen(true)
+            }}
+          >
+            Delete project
+          </ContextMenuItem>
+        </ContextMenuContent>
+      </ContextMenu>
+
+      <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Remove project</DialogTitle>
+            <DialogDescription>
+              This will remove {project.name} from your workspace list. The project files will not be deleted.
+            </DialogDescription>
+          </DialogHeader>
+          {deleteError && <p className="text-sm text-destructive">{deleteError}</p>}
+          <DialogFooter>
+            <Button variant="outline" type="button" onClick={() => setIsDeleteDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={handleDelete} disabled={isDeleting}>
+              {isDeleting ? "Removing…" : "Remove"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
+  )
 }

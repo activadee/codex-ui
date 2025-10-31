@@ -278,22 +278,16 @@ function App() {
     }
 
     return (
-      <div className="flex h-full w-full flex-col px-6 py-4">
+      <div className="flex h-full min-h-0 w-full flex-col">
         {alerts.length > 0 && (
-          <div className="flex flex-col gap-3">
+          <div className="mb-4 flex flex-col gap-3">
             <WorkspaceAlerts alerts={alerts} />
           </div>
         )}
-        <div
-          className={
-            alerts.length > 0
-              ? "mt-6 flex flex-1 flex-col overflow-hidden"
-              : "flex flex-1 flex-col overflow-hidden"
-          }
-        >
-          <ResizablePanelGroup direction="horizontal" className="flex h-full w-full">
-            <ResizablePanel defaultSize={70} minSize={40} className="min-w-0">
-              <div className="flex h-full min-w-0 flex-col overflow-hidden">
+        <div className="flex flex-1 min-h-0 flex-col overflow-hidden">
+          <ResizablePanelGroup direction="horizontal" className="flex h-full min-h-0 w-full">
+            <ResizablePanel defaultSize={70} minSize={40} className="min-w-0 min-h-0">
+              <div className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden">
                 <ConversationPane
                   projectName={projects.active.name}
                   thread={selection.thread}
@@ -303,17 +297,17 @@ function App() {
                 />
               </div>
             </ResizablePanel>
-            <ResizableHandle withHandle className="mx-3" />
-            <ResizablePanel defaultSize={30} minSize={25} className="min-w-[300px] max-w-[520px]">
-              <ResizablePanelGroup direction="vertical" className="h-full w-full">
-                <ResizablePanel defaultSize={50} minSize={30}>
-                  <div className="h-full">
+            <ResizableHandle withHandle />
+            <ResizablePanel defaultSize={30} minSize={25} className="min-w-[300px] max-w-[520px] min-h-0">
+              <ResizablePanelGroup direction="vertical" className="flex h-full min-h-0 w-full flex-col">
+                <ResizablePanel defaultSize={50} minSize={30} className="min-h-0">
+                  <div className="flex h-full min-h-0 flex-col">
                     <FilesPanel threadId={selection.thread?.id} />
                   </div>
                 </ResizablePanel>
-                <ResizableHandle withHandle className="my-2" />
-                <ResizablePanel defaultSize={50} minSize={30}>
-                  <div className="h-full">
+                <ResizableHandle withHandle />
+                <ResizablePanel defaultSize={50} minSize={30} className="min-h-0">
+                  <div className="flex h-full min-h-0 flex-col">
                     <ThreadTerminal threadId={selection.thread?.id} />
                   </div>
                 </ResizablePanel>

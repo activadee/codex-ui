@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef } from "react"
 import { FitAddon } from "@xterm/addon-fit"
 import { Terminal } from "@xterm/xterm"
 
+import { WorkspacePanel } from "@/components/app/workspace-panel"
 import { Button } from "@/components/ui/button"
 import { useThreadTerminal } from "@/hooks/useThreadTerminal"
 import { cn } from "@/lib/utils"
@@ -124,13 +125,11 @@ export function ThreadTerminal({ threadId }: ThreadTerminalProps) {
   const canRestart = status === "exited" || status === "error"
 
   return (
-    <div className="flex h-full flex-col overflow-hidden rounded-lg border border-border/60 bg-background/40">
-      <div className="flex items-center justify-between border-b border-border/60 px-3 py-2">
-        <div className="flex items-center gap-2 text-sm">
-          <span className="font-semibold text-foreground">Terminal</span>
+    <WorkspacePanel
+      title="Terminal"
+      actions={
+        <div className="flex items-center gap-2 text-xs">
           <StatusBadge status={status} label={statusLabel} isBusy={showSpinner} />
-        </div>
-        <div className="flex items-center gap-2">
           <Button
             size="icon"
             variant="ghost"
@@ -152,16 +151,16 @@ export function ThreadTerminal({ threadId }: ThreadTerminalProps) {
             {showSpinner ? <Loader2 className="h-4 w-4 animate-spin" /> : <RotateCcw className="h-4 w-4" />}
           </Button>
         </div>
-      </div>
-      <div className="relative flex-1 overflow-hidden">
-        <div ref={containerRef} className="h-full w-full" />
-        {!threadId && (
-          <div className="absolute inset-0 flex items-center justify-center bg-background/80 text-xs text-muted-foreground">
-            Select a thread to open a terminal.
-          </div>
-        )}
-      </div>
-    </div>
+      }
+      bodyClassName="relative"
+    >
+      <div ref={containerRef} className="h-full w-full" />
+      {!threadId && (
+        <div className="absolute inset-0 flex items-center justify-center bg-background/80 text-xs text-muted-foreground">
+          Select a thread to open a terminal.
+        </div>
+      )}
+    </WorkspacePanel>
   )
 }
 

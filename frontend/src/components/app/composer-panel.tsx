@@ -115,15 +115,15 @@ export function ComposerPanel({
   }
 
   return (
-    <div className="px-8 py-6">
+    <div className="pt-5">
       {/** Sticky todo dock shown above the input */}
       {Boolean(todolistHasItems(todoList)) && (
         <TodoDock todoList={todoList!} />
       )}
-      <div className="flex flex-col gap-3">
+      <div className="flex flex-col gap-2.5">
         <div
-          className="relative h-36 rounded-2xl border border-border bg-white text-base text-foreground shadow-sm focus-within:ring-2 focus-within:ring-primary"
-          style={{ paddingBottom: overlayHeight + 12 }}
+          className="relative h-32 border border-border/70 bg-white text-base text-foreground shadow-sm focus-within:ring-2 focus-within:ring-primary"
+          style={{ paddingBottom: overlayHeight + 10 }}
         >
           <Textarea
             value={prompt}
@@ -132,13 +132,13 @@ export function ComposerPanel({
             rows={3}
             placeholder={`Add a follow-up for ${projectName}`}
             ref={textareaRef}
-            className="h-full min-h-0 overflow-y-auto resize-none border-0 bg-transparent px-4 py-3 text-base shadow-none focus-visible:ring-0"
+            className="h-full min-h-0 overflow-y-auto resize-none border-0 bg-transparent px-3.5 py-2.5 text-base shadow-none focus-visible:ring-0"
           />
 
           {/** Bottom bar inside the input wrapper: selects on left, actions on right */}
           <div
             ref={overlayBarRef}
-            className="pointer-events-none absolute inset-x-3 bottom-3 z-10 flex items-center justify-between"
+            className="pointer-events-none absolute inset-x-3 bottom-2.5 z-10 flex items-center justify-between"
           >
             <div className="pointer-events-auto flex items-center gap-3 text-muted-foreground">
               <ControlSelect
@@ -163,7 +163,7 @@ export function ComposerPanel({
                 variant="inline"
               />
             </div>
-            <div className="pointer-events-auto flex items-center gap-2">
+            <div className="pointer-events-auto flex items-center gap-1.5">
               <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full" title="Attach file">
                 <Paperclip className="h-4 w-4" />
               </Button>
@@ -184,7 +184,7 @@ export function ComposerPanel({
                   type="button"
                   onClick={onStop}
                   variant="secondary"
-                  className="rounded-full px-4 h-9"
+                  className="h-9 rounded-full px-4"
                 >
                   <Square className="h-4 w-4" />
                   Stop
@@ -194,7 +194,7 @@ export function ComposerPanel({
                 type="button"
                 onClick={onSend}
                 disabled={actionDisabled}
-                className="rounded-full px-5 h-9"
+                className="h-9 rounded-full px-5"
                 title="Send"
               >
                 <SendHorizonal className="mr-2 h-4 w-4" />
@@ -213,10 +213,10 @@ export function ComposerPanel({
           onChange={handleFileSelection}
         />
         {attachments.length > 0 && (
-          <div className="flex flex-wrap gap-3">
+          <div className="flex flex-wrap gap-2.5">
             {attachments.map((attachment) => (
               <div key={attachment.id} className="relative flex w-28 flex-col gap-1 text-xs">
-                <div className="relative aspect-square w-full overflow-hidden rounded-xl border border-border bg-muted">
+                <div className="relative aspect-square w-full overflow-hidden rounded-lg border border-border bg-muted">
                   <img
                     src={attachment.previewUrl}
                     alt={attachment.name}
@@ -227,7 +227,7 @@ export function ComposerPanel({
                     type="button"
                     onClick={() => onRemoveAttachment(attachment.id)}
                     aria-label={`Remove ${attachment.name}`}
-                    className="absolute right-1 top-1 flex h-6 w-6 items-center justify-center rounded-full bg-background/90 text-muted-foreground shadow-sm transition hover:text-foreground"
+                    className="absolute right-1.5 top-1.5 flex h-6 w-6 items-center justify-center rounded-full bg-background/90 text-muted-foreground shadow-sm transition hover:text-foreground"
                   >
                     <X className="h-4 w-4" />
                   </button>
@@ -269,10 +269,10 @@ function TodoDock({
   }, [items])
 
   return (
-    <div className="mb-4 rounded-xl border border-primary/30 bg-primary/5">
+    <div className="bg-primary/5">
       <button
         type="button"
-        className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left text-sm text-foreground"
+        className="flex w-full items-center justify-between gap-3 px-4 py-2.5 text-left text-sm text-foreground"
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
       >
@@ -280,10 +280,10 @@ function TodoDock({
           <ListChecks className="h-4 w-4 text-primary" />
           <span className="truncate">To-dos</span>
         </span>
-        <span className="flex shrink-0 items-center gap-4 text-xs text-muted-foreground">
-          <span className="rounded-full bg-primary/10 px-2 py-1 text-primary">{total} total</span>
-          <span className="rounded-full bg-emerald-100/60 px-2 py-1 text-emerald-700">{done} done</span>
-          <span className="rounded-full bg-amber-100/60 px-2 py-1 text-amber-700">{left} left</span>
+        <span className="flex shrink-0 items-center gap-3 text-xs text-muted-foreground">
+          <span className="rounded-full bg-primary/10 px-2 py-0.5 text-primary">{total} total</span>
+          <span className="rounded-full bg-emerald-100/60 px-2 py-0.5 text-emerald-700">{done} done</span>
+          <span className="rounded-full bg-amber-100/60 px-2 py-0.5 text-amber-700">{left} left</span>
           {open ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
         </span>
       </button>

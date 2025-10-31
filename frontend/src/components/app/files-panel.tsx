@@ -1,6 +1,7 @@
 import { Loader2, RefreshCw } from "lucide-react"
 import { useCallback } from "react"
 
+import { WorkspacePanel } from "@/components/app/workspace-panel"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import { useThreadFileDiffs } from "@/hooks/useThreadFileDiffs"
@@ -17,9 +18,9 @@ export function FilesPanel({ threadId }: FilesPanelProps) {
   }, [refresh])
 
   return (
-    <div className="flex h-full flex-col overflow-hidden rounded-lg border border-border/60 bg-background/40">
-      <div className="flex items-center justify-between border-b border-border/60 px-3 py-2">
-        <h2 className="text-sm font-semibold text-foreground">Files</h2>
+    <WorkspacePanel
+      title="Files"
+      actions={
         <Button
           size="icon"
           variant="ghost"
@@ -30,9 +31,10 @@ export function FilesPanel({ threadId }: FilesPanelProps) {
         >
           {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
         </Button>
-      </div>
-      <div className="flex-1 overflow-hidden">
-        <div className="h-full overflow-y-auto px-3 py-3 text-sm text-foreground">
+      }
+      bodyClassName="px-3 py-3 text-sm text-foreground"
+    >
+      <div className="h-full overflow-y-auto">
           {error ? (
             <div className="rounded-md border border-destructive/50 bg-destructive/10 px-3 py-2 text-xs text-destructive">
               {error}
@@ -60,9 +62,8 @@ export function FilesPanel({ threadId }: FilesPanelProps) {
               ))}
             </ul>
           )}
-        </div>
       </div>
-    </div>
+    </WorkspacePanel>
   )
 }
 

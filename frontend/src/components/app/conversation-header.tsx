@@ -28,48 +28,35 @@ export function ConversationHeader({
   ].filter(Boolean) as Array<{ icon: ReactNode; label: string }>
 
   return (
-    <header className="rounded-lg border border-border/60 bg-background/60 px-6 py-5 shadow-sm">
-      <div className="flex flex-wrap items-start justify-between gap-6">
-        <div className="space-y-3">
-          <span className="inline-flex items-center gap-2 rounded-full border border-border/70 bg-background/70 px-3 py-1 text-xs font-medium uppercase tracking-[0.28em] text-muted-foreground">
-            {projectName ?? "Workspace"}
-          </span>
-          <h1 className="text-2xl font-semibold leading-tight text-foreground">
-            {thread?.title ?? "Start a new conversation"}
-          </h1>
-          <div className="flex flex-wrap items-center gap-3 text-xs font-medium text-muted-foreground">
-            <span
-              className={cn(
-                "inline-flex items-center gap-2 rounded-full border px-3 py-1 transition-colors",
-                statusTone
-              )}
-            >
-              <Radio className="h-3.5 w-3.5" />
-              {statusLabel}
-            </span>
-            {updatedRelative && (
-              <span className="inline-flex items-center gap-2 rounded-full border border-border/60 bg-background/60 px-3 py-1">
-                <BadgeCheck className="h-3.5 w-3.5" />
-                Updated {updatedRelative}
-              </span>
-            )}
-          </div>
-        </div>
-        {metaItems.length > 0 && (
-          <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
-            {metaItems.map(({ icon, label }) => (
-              <span
-                key={label}
-                className="inline-flex items-center gap-2 rounded-md border border-border/60 bg-background/80 px-3 py-1 font-medium"
-              >
-                {icon}
-                {label}
-              </span>
-            ))}
-          </div>
+    <div className="flex flex-wrap items-center gap-2 text-xs font-medium text-muted-foreground">
+      <span className="text-[11px] uppercase tracking-[0.2em] text-muted-foreground/80">
+        {projectName ?? "Workspace"}
+      </span>
+      <span
+        className={cn(
+          "inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 transition-colors",
+          statusTone
         )}
-      </div>
-    </header>
+      >
+        <Radio className="h-3.5 w-3.5" />
+        {statusLabel}
+      </span>
+      {updatedRelative && (
+        <span className="inline-flex items-center gap-1.5 rounded-md border border-border/60 bg-background/70 px-2.5 py-1">
+          <BadgeCheck className="h-3.5 w-3.5" />
+          {updatedRelative}
+        </span>
+      )}
+      {metaItems.map(({ icon, label }) => (
+        <span
+          key={label}
+          className="inline-flex items-center gap-1.5 rounded-md border border-border/60 bg-background/70 px-2.5 py-1"
+        >
+          {icon}
+          {label}
+        </span>
+      ))}
+    </div>
   )
 }
 
@@ -154,6 +141,6 @@ function getStatusTone(status: AgentThread["status"] | undefined) {
     case "stopped":
       return "border-amber-300/60 bg-amber-500/10 text-amber-600"
     default:
-      return "border-border/60 bg-background/70 text-muted-foreground"
+      return "border-border/60 bg-muted/60 text-muted-foreground"
   }
 }
