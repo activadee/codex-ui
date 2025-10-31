@@ -29,9 +29,6 @@ export function ConversationHeader({
 
   return (
     <div className="flex flex-wrap items-center gap-2 text-xs font-medium text-muted-foreground">
-      <span className="text-[11px] uppercase tracking-[0.2em] text-muted-foreground/80">
-        {projectName ?? "Workspace"}
-      </span>
       <span
         className={cn(
           "inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 transition-colors",
@@ -47,15 +44,6 @@ export function ConversationHeader({
           {updatedRelative}
         </span>
       )}
-      {metaItems.map(({ icon, label }) => (
-        <span
-          key={label}
-          className="inline-flex items-center gap-1.5 rounded-md border border-border/60 bg-background/70 px-2.5 py-1"
-        >
-          {icon}
-          {label}
-        </span>
-      ))}
     </div>
   )
 }

@@ -42,7 +42,7 @@ export function WorkspaceShell({ sidebar, main, footer }: WorkspaceShellProps) {
         onThreadDelete={sidebar.onThreadDelete}
       />
       <div className="flex flex-1 flex-col overflow-hidden">
-        <main className="flex-1 min-h-0 overflow-hidden bg-white pb-5">{main}</main>
+        <main className="flex-1 min-h-0 overflow-hidden bg-white">{main}</main>
         {footer && <div className="border-t border-border/70 bg-white">{footer}</div>}
       </div>
     </div>
