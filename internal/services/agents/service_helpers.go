@@ -102,6 +102,7 @@ func toThreadDTO(record discovery.Thread) ThreadDTO {
 		ID:             record.ID,
 		ProjectID:      record.ProjectID,
 		ExternalID:     record.ExternalID,
+		WorktreePath:   record.WorktreePath,
 		Title:          record.Title,
 		Model:          record.Model,
 		SandboxMode:    record.SandboxMode,

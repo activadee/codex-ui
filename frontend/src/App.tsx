@@ -4,6 +4,9 @@ import { WorkspaceShell } from "@/components/app/workspace-shell"
 import { WorkspaceAlerts } from "@/components/app/workspace-alerts"
 import { ConversationPane } from "@/components/app/conversation-pane"
 import { ComposerPanel } from "@/components/app/composer-panel"
+import { FilesPanel } from "@/components/app/files-panel"
+import { ThreadTerminal } from "@/components/app/thread-terminal"
+import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable"
 import { ManageProjectDialog } from "@/components/app/manage-project-dialog"
 import {
   getReasoningOptions,
@@ -288,13 +291,35 @@ function App() {
               : "flex flex-1 flex-col overflow-hidden"
           }
         >
-          <ConversationPane
-            projectName={projects.active.name}
-            thread={selection.thread}
-            entries={conversation.list}
-            isStreaming={stream.isStreaming}
-            streamStatus={stream.status}
-          />
+          <ResizablePanelGroup direction="horizontal" className="flex h-full w-full">
+            <ResizablePanel defaultSize={70} minSize={40} className="min-w-0">
+              <div className="flex h-full min-w-0 flex-col overflow-hidden">
+                <ConversationPane
+                  projectName={projects.active.name}
+                  thread={selection.thread}
+                  entries={conversation.list}
+                  isStreaming={stream.isStreaming}
+                  streamStatus={stream.status}
+                />
+              </div>
+            </ResizablePanel>
+            <ResizableHandle withHandle className="mx-3" />
+            <ResizablePanel defaultSize={30} minSize={25} className="min-w-[300px] max-w-[520px]">
+              <ResizablePanelGroup direction="vertical" className="h-full w-full">
+                <ResizablePanel defaultSize={50} minSize={30}>
+                  <div className="h-full">
+                    <FilesPanel threadId={selection.thread?.id} />
+                  </div>
+                </ResizablePanel>
+                <ResizableHandle withHandle className="my-2" />
+                <ResizablePanel defaultSize={50} minSize={30}>
+                  <div className="h-full">
+                    <ThreadTerminal threadId={selection.thread?.id} />
+                  </div>
+                </ResizablePanel>
+              </ResizablePanelGroup>
+            </ResizablePanel>
+          </ResizablePanelGroup>
         </div>
       </div>
     )
@@ -302,17 +327,13 @@ function App() {
 
   // derive the latest todo list from conversation entries
   const latestTodoList = useMemo(() => {
-    for (let i = conversation.list.length - 1; i >= 0; i--) {
-      const entry = conversation.list[i]
-      if (entry.role === "agent" && entry.item?.type === "todo_list" && entry.item.todoList) {
-        const items = entry.item.todoList.items ?? []
+    for (let index = conversation.list.length - 1; index >= 0; index -= 1) {
+      const entry = conversation.list[index]
       if (entry.role === "agent" && entry.item?.type === "todo_list") {
         const items = entry.item.todoList?.items ?? []
         return { items }
       }
-          return { items }
-        }
-      }
+    }
     return null
   }, [conversation.list])
 

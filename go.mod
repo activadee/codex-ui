@@ -4,6 +4,8 @@ go 1.24.0
 
 require (
 	github.com/activadee/godex v0.0.4
+	github.com/creack/pty v1.1.23
+	github.com/fsnotify/fsnotify v1.9.0
 	github.com/google/uuid v1.6.0
 	github.com/pressly/goose/v3 v3.26.0
 	github.com/wailsapp/wails/v2 v2.10.2

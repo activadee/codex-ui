@@ -30,6 +30,10 @@ export function ListProjects() {
   return window['go']['main']['App']['ListProjects']();
 }
 
+export function ListThreadFileDiffs(arg1) {
+  return window['go']['main']['App']['ListThreadFileDiffs'](arg1);
+}
+
 export function ListThreads(arg1) {
   return window['go']['main']['App']['ListThreads'](arg1);
 }
@@ -50,6 +54,10 @@ export function RenameThread(arg1, arg2) {
   return window['go']['main']['App']['RenameThread'](arg1, arg2);
 }
 
+export function ResizeThreadTerminal(arg1, arg2, arg3) {
+  return window['go']['main']['App']['ResizeThreadTerminal'](arg1, arg2, arg3);
+}
+
 export function SaveClipboardImage(arg1, arg2) {
   return window['go']['main']['App']['SaveClipboardImage'](arg1, arg2);
 }
@@ -60,4 +68,16 @@ export function SelectProjectDirectory(arg1) {
 
 export function SendAgentMessage(arg1) {
   return window['go']['main']['App']['SendAgentMessage'](arg1);
+}
+
+export function StartThreadTerminal(arg1) {
+  return window['go']['main']['App']['StartThreadTerminal'](arg1);
+}
+
+export function StopThreadTerminal(arg1) {
+  return window['go']['main']['App']['StopThreadTerminal'](arg1);
+}
+
+export function WriteThreadTerminal(arg1, arg2) {
+  return window['go']['main']['App']['WriteThreadTerminal'](arg1, arg2);
 }

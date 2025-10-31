@@ -247,6 +247,24 @@ export namespace agents {
 	}
 	
 	
+	export class FileDiffStatDTO {
+	    path: string;
+	    added: number;
+	    removed: number;
+	    status?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new FileDiffStatDTO(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.path = source["path"];
+	        this.added = source["added"];
+	        this.removed = source["removed"];
+	        this.status = source["status"];
+	    }
+	}
 	
 	export class TurnOptionsDTO {
 	    outputSchema?: number[];
@@ -344,6 +362,7 @@ export namespace agents {
 	    id: number;
 	    projectId: number;
 	    externalId?: string;
+	    worktreePath?: string;
 	    title: string;
 	    model: string;
 	    sandboxMode: string;
@@ -362,6 +381,7 @@ export namespace agents {
 	        this.id = source["id"];
 	        this.projectId = source["projectId"];
 	        this.externalId = source["externalId"];
+	        this.worktreePath = source["worktreePath"];
 	        this.title = source["title"];
 	        this.model = source["model"];
 	        this.sandboxMode = source["sandboxMode"];
@@ -377,6 +397,23 @@ export namespace agents {
 	
 	
 	
+
+}
+
+export namespace main {
+	
+	export class TerminalHandle {
+	    threadId: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new TerminalHandle(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.threadId = source["threadId"];
+	    }
+	}
 
 }
 

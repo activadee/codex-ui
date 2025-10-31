@@ -1,5 +1,8 @@
-import { BadgeCheck, Radio } from "lucide-react"
+import type { ReactNode } from "react"
 
+import { BadgeCheck, Cpu, Radio, Sparkles } from "lucide-react"
+
+import { cn } from "@/lib/utils"
 import type { AgentThread } from "@/types/app"
 
 type ConversationHeaderProps = {
@@ -14,30 +17,59 @@ export function ConversationHeader({
   const statusLabel = thread ? getStatusLabel(thread.status) : "Draft"
   const updatedAt = thread?.lastMessageAt ?? thread?.updatedAt
   const updatedRelative = formatRelativeTime(updatedAt)
+  const sandboxLabel = thread ? formatSandbox(thread.sandboxMode) || null : null
+  const reasoningLabel = thread ? formatReasoning(thread.reasoningLevel) || null : null
+  const modelLabel = thread?.model ?? null
+  const statusTone = getStatusTone(thread?.status)
+  const metaItems = [
+    modelLabel ? { icon: <Cpu className="h-3.5 w-3.5" />, label: modelLabel } : null,
+    sandboxLabel ? { icon: <Sparkles className="h-3.5 w-3.5" />, label: sandboxLabel } : null,
+    reasoningLabel ? { icon: <Sparkles className="h-3.5 w-3.5" />, label: reasoningLabel } : null
+  ].filter(Boolean) as Array<{ icon: ReactNode; label: string }>
 
   return (
-    <div className=" bg-card px-8 py-6">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div className="space-y-2">
-          <p className="text-xs font-semibold uppercase tracking-[0.32em] text-muted-foreground">{projectName ?? "Workspace"}</p>
+    <header className="rounded-lg border border-border/60 bg-background/60 px-6 py-5 shadow-sm">
+      <div className="flex flex-wrap items-start justify-between gap-6">
+        <div className="space-y-3">
+          <span className="inline-flex items-center gap-2 rounded-full border border-border/70 bg-background/70 px-3 py-1 text-xs font-medium uppercase tracking-[0.28em] text-muted-foreground">
+            {projectName ?? "Workspace"}
+          </span>
           <h1 className="text-2xl font-semibold leading-tight text-foreground">
             {thread?.title ?? "Start a new conversation"}
           </h1>
-          <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
-            <span className="flex items-center gap-1">
+          <div className="flex flex-wrap items-center gap-3 text-xs font-medium text-muted-foreground">
+            <span
+              className={cn(
+                "inline-flex items-center gap-2 rounded-full border px-3 py-1 transition-colors",
+                statusTone
+              )}
+            >
               <Radio className="h-3.5 w-3.5" />
               {statusLabel}
             </span>
             {updatedRelative && (
-              <span className="flex items-center gap-1">
+              <span className="inline-flex items-center gap-2 rounded-full border border-border/60 bg-background/60 px-3 py-1">
                 <BadgeCheck className="h-3.5 w-3.5" />
                 Updated {updatedRelative}
               </span>
             )}
           </div>
         </div>
+        {metaItems.length > 0 && (
+          <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
+            {metaItems.map(({ icon, label }) => (
+              <span
+                key={label}
+                className="inline-flex items-center gap-2 rounded-md border border-border/60 bg-background/80 px-3 py-1 font-medium"
+              >
+                {icon}
+                {label}
+              </span>
+            ))}
+          </div>
+        )}
       </div>
-    </div>
+    </header>
   )
 }
 
@@ -58,7 +90,7 @@ function getStatusLabel(status: AgentThread["status"] | undefined): string {
 
 function formatSandbox(value?: string) {
   if (!value) {
-    return "Workspace"
+    return ""
   }
   switch (value) {
     case "workspace-write":
@@ -74,7 +106,7 @@ function formatSandbox(value?: string) {
 
 function formatReasoning(value?: string) {
   if (!value) {
-    return "Default"
+    return ""
   }
   return value.charAt(0).toUpperCase() + value.slice(1)
 }
@@ -109,4 +141,19 @@ function formatRelativeTime(value?: string) {
     duration /= amount
   }
   return ""
+}
+
+function getStatusTone(status: AgentThread["status"] | undefined) {
+  switch (status) {
+    case "active":
+      return "border-sky-300/60 bg-sky-500/10 text-sky-600"
+    case "completed":
+      return "border-emerald-300/60 bg-emerald-500/10 text-emerald-600"
+    case "failed":
+      return "border-rose-300/60 bg-rose-500/10 text-rose-600"
+    case "stopped":
+      return "border-amber-300/60 bg-amber-500/10 text-amber-600"
+    default:
+      return "border-border/60 bg-background/70 text-muted-foreground"
+  }
 }

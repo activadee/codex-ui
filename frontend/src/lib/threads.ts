@@ -2,6 +2,8 @@ import { agents } from "../../wailsjs/go/models"
 import type { AgentThread, ThreadListItem, ThreadSection } from "@/types/app"
 
 const streamTopicPrefix = "agent:stream:"
+const fileChangeTopicPrefix = "agent:file-change:"
+const terminalTopicPrefix = "agent:terminal:"
 
 const dateFormatter = new Intl.DateTimeFormat(undefined, {
   dateStyle: "short",
@@ -18,6 +20,7 @@ export function mapThreadDtoToThread(dto: agents.ThreadDTO): AgentThread {
     id: dto.id,
     projectId: dto.projectId,
     externalId: dto.externalId,
+    worktreePath: dto.worktreePath,
     title: dto.title,
     model: dto.model,
     sandboxMode: dto.sandboxMode,
@@ -99,6 +102,14 @@ export function formatTimestamp(value: string | undefined): string {
 
 export function streamTopic(streamId: string): string {
   return `${streamTopicPrefix}${streamId}`
+}
+
+export function fileChangeTopic(threadId: number): string {
+  return `${fileChangeTopicPrefix}${threadId}`
+}
+
+export function terminalTopic(threadId: number): string {
+  return `${terminalTopicPrefix}${threadId}`
 }
 
 export function threadToListItem(thread: AgentThread): ThreadListItem {
