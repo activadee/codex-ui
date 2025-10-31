@@ -300,6 +300,20 @@ function App() {
     )
   }, [alerts, conversation.list, projects.active, selection.thread, stream.isStreaming, stream.status])
 
+  // derive the latest todo list from conversation entries
+  const latestTodoList = useMemo(() => {
+    for (let i = conversation.list.length - 1; i >= 0; i--) {
+      const entry = conversation.list[i]
+      if (entry.role === "agent" && entry.item?.type === "todo_list" && entry.item.todoList) {
+        const items = entry.item.todoList.items ?? []
+        if (items.length > 0) {
+          return { items }
+        }
+      }
+    }
+    return null
+  }, [conversation.list])
+
   return (
     <>
       <WorkspaceShell
@@ -347,12 +361,13 @@ function App() {
                 reasoningOptions.find((option) => option.value === value) ?? reasoningOptions[0]
               )
             }
-            onSandboxChange={(value) =>
-              setSandbox(sandboxOptions.find((option) => option.value === value) ?? sandboxOptions[0])
-            }
-            usage={stream.usage}
-            status={stream.status}
-            errorMessage={stream.error}
+          onSandboxChange={(value) =>
+            setSandbox(sandboxOptions.find((option) => option.value === value) ?? sandboxOptions[0])
+          }
+          usage={stream.usage}
+          status={stream.status}
+          errorMessage={stream.error}
+          todoList={latestTodoList}
           />
         }
       />

@@ -63,6 +63,10 @@ type ConversationEntryCardProps = {
 }
 
 function ConversationEntryCard({ entry }: ConversationEntryCardProps) {
+  // Hide todo list entries; they are rendered in the sticky Todos panel
+  if (entry.role === "agent" && entry.item?.type === "todo_list") {
+    return null
+  }
   switch (entry.role) {
     case "user":
       return <UserEntryCard entry={entry} />
