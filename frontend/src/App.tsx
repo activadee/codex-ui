@@ -306,7 +306,10 @@ function App() {
       const entry = conversation.list[i]
       if (entry.role === "agent" && entry.item?.type === "todo_list" && entry.item.todoList) {
         const items = entry.item.todoList.items ?? []
-        if (items.length > 0) {
+      if (entry.role === "agent" && entry.item?.type === "todo_list") {
+        const items = entry.item.todoList?.items ?? []
+        return { items }
+      }
           return { items }
         }
       }
