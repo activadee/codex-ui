@@ -53,8 +53,8 @@ jobs:
           app-working-directory: .
           build-name: codex-ui
           build-platform: ${{ matrix.platform }}
-          go-version: "1.24"
-          node-version: "20"
+          go-version: "1.25.3"
+          node-version: "22"
           package: false
           build-obfuscate: true
           wails-version: "v2.10.2"
