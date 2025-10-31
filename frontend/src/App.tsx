@@ -4,6 +4,9 @@ import { WorkspaceShell } from "@/components/app/workspace-shell"
 import { WorkspaceAlerts } from "@/components/app/workspace-alerts"
 import { ConversationPane } from "@/components/app/conversation-pane"
 import { ComposerPanel } from "@/components/app/composer-panel"
+import { FilesPanel } from "@/components/app/files-panel"
+import { ThreadTerminal } from "@/components/app/thread-terminal"
+import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable"
 import { ManageProjectDialog } from "@/components/app/manage-project-dialog"
 import {
   getReasoningOptions,
@@ -275,26 +278,42 @@ function App() {
     }
 
     return (
-      <div className="flex h-full w-full flex-col px-6 py-4">
+      <div className="flex h-full min-h-0 w-full flex-col">
         {alerts.length > 0 && (
-          <div className="flex flex-col gap-3">
+          <div className="mb-4 flex flex-col gap-3">
             <WorkspaceAlerts alerts={alerts} />
           </div>
         )}
-        <div
-          className={
-            alerts.length > 0
-              ? "mt-6 flex flex-1 flex-col overflow-hidden"
-              : "flex flex-1 flex-col overflow-hidden"
-          }
-        >
-          <ConversationPane
-            projectName={projects.active.name}
-            thread={selection.thread}
-            entries={conversation.list}
-            isStreaming={stream.isStreaming}
-            streamStatus={stream.status}
-          />
+        <div className="flex flex-1 min-h-0 flex-col overflow-hidden">
+          <ResizablePanelGroup direction="horizontal" className="flex h-full min-h-0 w-full">
+            <ResizablePanel defaultSize={70} minSize={40} className="min-w-0 min-h-0">
+              <div className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden">
+                <ConversationPane
+                  projectName={projects.active.name}
+                  thread={selection.thread}
+                  entries={conversation.list}
+                  isStreaming={stream.isStreaming}
+                  streamStatus={stream.status}
+                />
+              </div>
+            </ResizablePanel>
+            <ResizableHandle withHandle />
+            <ResizablePanel defaultSize={30} minSize={25} className="min-w-[300px] max-w-[520px] min-h-0">
+              <ResizablePanelGroup direction="vertical" className="flex h-full min-h-0 w-full flex-col">
+                <ResizablePanel defaultSize={50} minSize={30} className="min-h-0">
+                  <div className="flex h-full min-h-0 flex-col">
+                    <FilesPanel threadId={selection.thread?.id} />
+                  </div>
+                </ResizablePanel>
+                <ResizableHandle withHandle />
+                <ResizablePanel defaultSize={50} minSize={30} className="min-h-0">
+                  <div className="flex h-full min-h-0 flex-col">
+                    <ThreadTerminal threadId={selection.thread?.id} />
+                  </div>
+                </ResizablePanel>
+              </ResizablePanelGroup>
+            </ResizablePanel>
+          </ResizablePanelGroup>
         </div>
       </div>
     )
@@ -302,17 +321,13 @@ function App() {
 
   // derive the latest todo list from conversation entries
   const latestTodoList = useMemo(() => {
-    for (let i = conversation.list.length - 1; i >= 0; i--) {
-      const entry = conversation.list[i]
-      if (entry.role === "agent" && entry.item?.type === "todo_list" && entry.item.todoList) {
-        const items = entry.item.todoList.items ?? []
+    for (let index = conversation.list.length - 1; index >= 0; index -= 1) {
+      const entry = conversation.list[index]
       if (entry.role === "agent" && entry.item?.type === "todo_list") {
         const items = entry.item.todoList?.items ?? []
         return { items }
       }
-          return { items }
-        }
-      }
+    }
     return null
   }, [conversation.list])
 

@@ -41,11 +41,11 @@ export function ConversationView({ entries, isStreaming, streamStatus, projectNa
   }
 
   return (
-    <div className="flex min-w-0 flex-1 overflow-hidden">
-      <div className="flex min-w-0 flex-1 flex-col">
-        <div className="flex min-w-0 flex-1 overflow-hidden">
-          <div className="min-w-0 flex-1 overflow-y-auto px-4 py-6 md:px-8 md:py-8">
-            <div className="mx-auto flex w-full max-w-5xl flex-col gap-4">
+    <div className="flex min-w-0 flex-1 min-h-0 overflow-hidden bg-white">
+      <div className="flex min-w-0 flex-1 min-h-0 flex-col">
+        <div className="flex min-w-0 flex-1 min-h-0 overflow-hidden">
+          <div className="min-w-0 flex-1 overflow-y-auto px-4 pb-6 pt-1 md:px-6 md:pb-8 md:pt-2">
+            <div className="mx-auto flex w-full max-w-5xl flex-col gap-3">
               {entries.map((entry) => (
                 <ConversationEntryCard key={entry.id} entry={entry} />
               ))}
@@ -83,15 +83,15 @@ function UserEntryCard({ entry }: { entry: UserConversationEntry }) {
   const timestamp = formatTime(entry.createdAt)
 
   return (
-    <article className="min-w-0 w-full max-w-full overflow-hidden rounded-xl border border-border/60 bg-white/70 px-5 py-4 shadow-sm">
-      <header className="flex items-center justify-between gap-3 text-xs font-semibold uppercase tracking-[0.28em] text-muted-foreground">
+    <article className="min-w-0 w-full max-w-full overflow-hidden rounded-xl border border-border/60 bg-white px-4 py-3 shadow-sm">
+      <header className="flex items-center justify-between gap-2 text-[11px] font-semibold uppercase tracking-[0.22em] text-muted-foreground">
         <span className="flex min-w-0 items-center gap-2">
           <User className="h-4 w-4" aria-hidden /> You
         </span>
         <time className="shrink-0 text-[11px] tracking-wide text-muted-foreground/80">{timestamp}</time>
       </header>
-      <div className="mt-3 max-w-full space-y-3 text-sm text-foreground">
-        {entry.text && <p className="whitespace-pre-wrap break-words leading-relaxed">{entry.text}</p>}
+      <div className="mt-2 max-w-full space-y-2 text-sm text-foreground">
+        {entry.text && <p className="whitespace-pre-wrap wrap-break-word leading-relaxed">{entry.text}</p>}
       </div>
     </article>
   )
@@ -101,20 +101,20 @@ function AgentEntryCard({ entry }: { entry: AgentConversationEntry }) {
   const timestamp = formatTime(entry.updatedAt)
   const { item } = entry
 
-  const sharedClasses = "min-w-0 w-full max-w-full overflow-hidden rounded-xl border border-primary/30 bg-primary/5 px-5 py-4 shadow-sm"
+  const sharedClasses = "min-w-0 w-full max-w-full overflow-hidden rounded-xl border border-primary/30 bg-primary/5 px-4 py-3 shadow-sm"
   const Icon = selectAgentIcon(item.type)
   const label = agentLabel(item.type)
 
   return (
     <article className={sharedClasses}>
-      <header className="flex items-center justify-between gap-3 text-xs font-semibold uppercase tracking-[0.28em] text-primary">
+      <header className="flex items-center justify-between gap-2 text-[11px] font-semibold uppercase tracking-[0.22em] text-primary">
         <span className="flex min-w-0 items-center gap-2">
           {Icon && <Icon className="h-4 w-4" aria-hidden />}
           {label}
         </span>
         <time className="shrink-0 text-[11px] tracking-wide text-muted-foreground/80">{timestamp}</time>
       </header>
-      <div className="mt-3 max-w-full space-y-3 text-sm text-foreground">
+      <div className="mt-2 max-w-full space-y-2 text-sm text-foreground">
         {renderAgentContent(item)}
       </div>
     </article>
@@ -128,8 +128,8 @@ function SystemEntryCard({ entry }: { entry: SystemConversationEntry }) {
   return (
     <div
       className={cn(
-        "flex min-w-0 w-full max-w-full items-center justify-between overflow-hidden rounded-xl border px-4 py-3 text-xs font-medium",
-        isError ? "border-destructive/40 bg-destructive/10 text-destructive" : "border-muted bg-muted/70 text-muted-foreground"
+        "flex min-w-0 w-full max-w-full items-center justify-between overflow-hidden rounded-xl border px-3 py-2 text-xs font-medium",
+        isError ? "border-destructive/40 bg-destructive/10 text-destructive" : "border-muted bg-muted/60 text-muted-foreground"
       )}
     >
       <span className="flex min-w-0 flex-1 items-center gap-2">
@@ -144,7 +144,7 @@ function SystemEntryCard({ entry }: { entry: SystemConversationEntry }) {
 function StreamingIndicator({ status }: { status: string }) {
   const label = status === "streaming" ? "Assistant responding" : status
   return (
-    <div className="flex min-w-0 w-full max-w-full items-center gap-3 overflow-hidden rounded-xl border border-primary/20 bg-primary/10 px-4 py-3 text-xs font-medium text-primary">
+    <div className="flex min-w-0 w-full max-w-full items-center gap-2 overflow-hidden rounded-xl border border-primary/20 bg-primary/10 px-3 py-2 text-xs font-medium text-primary">
       <Loader2 className="h-4 w-4 animate-spin" />
       <span className="wrap-break-word">{label}</span>
     </div>

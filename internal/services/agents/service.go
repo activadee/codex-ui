@@ -32,37 +32,39 @@ type StreamResult struct {
 
 // Service routes requests to registered adapters.
 type Service struct {
-    mu           sync.RWMutex
-    adapters     map[string]Adapter
-    defaultAgent string
-    repo         *discovery.Repository
+	mu           sync.RWMutex
+	adapters     map[string]Adapter
+	defaultAgent string
+	repo         *discovery.Repository
 
-    activeMu sync.Mutex
-    active   map[string]*activeStream
+	activeMu sync.Mutex
+	active   map[string]*activeStream
 
-    worktrees *worktrees.Manager
-    // cleanup controls
-    cleanupStop chan struct{}
+	worktrees *worktrees.Manager
+	// cleanup controls
+	cleanupStop chan struct{}
 }
 
 // NewService constructs an empty service.
 type ServiceOption func(*Service)
 
-func WithWorktreeManager(m *worktrees.Manager) ServiceOption { return func(s *Service) { s.worktrees = m } }
+func WithWorktreeManager(m *worktrees.Manager) ServiceOption {
+	return func(s *Service) { s.worktrees = m }
+}
 
 func NewService(defaultAgent string, repo *discovery.Repository, opts ...ServiceOption) *Service {
-    s := &Service{
-        adapters:     make(map[string]Adapter),
-        defaultAgent: defaultAgent,
-        repo:         repo,
-        active:       make(map[string]*activeStream),
-    }
-    for _, opt := range opts {
-        if opt != nil {
-            opt(s)
-        }
-    }
-    return s
+	s := &Service{
+		adapters:     make(map[string]Adapter),
+		defaultAgent: defaultAgent,
+		repo:         repo,
+		active:       make(map[string]*activeStream),
+	}
+	for _, opt := range opts {
+		if opt != nil {
+			opt(s)
+		}
+	}
+	return s
 }
 
 // Register associates an adapter with an agent identifier.
@@ -82,10 +84,22 @@ func (s *Service) Register(agentID string, adapter Adapter) error {
 
 // StreamInitialTopicPrefix defines the event prefix used for runtime emissions.
 const StreamInitialTopicPrefix = "agent:stream:"
+const fileChangeTopicPrefix = "agent:file-change:"
+const terminalTopicPrefix = "agent:terminal:"
 
 // StreamTopic returns the runtime event topic for a given stream ID.
 func StreamTopic(streamID string) string {
 	return StreamInitialTopicPrefix + streamID
+}
+
+// FileChangeTopic returns the runtime event topic for file change notifications.
+func FileChangeTopic(threadID int64) string {
+	return fmt.Sprintf("%s%d", fileChangeTopicPrefix, threadID)
+}
+
+// TerminalTopic returns the runtime event topic for terminal streaming.
+func TerminalTopic(threadID int64) string {
+	return fmt.Sprintf("%s%d", terminalTopicPrefix, threadID)
 }
 
 // Stream represents a running agent interaction.
@@ -173,26 +187,26 @@ func (s *Service) Send(ctx context.Context, req MessageRequest) (*Stream, discov
 		return nil, discovery.Thread{}, err
 	}
 
-    thread, err := s.prepareThread(ctx, &req)
-    if err != nil {
-        return nil, discovery.Thread{}, err
-    }
+	thread, err := s.prepareThread(ctx, &req)
+	if err != nil {
+		return nil, discovery.Thread{}, err
+	}
 
-    // Ensure worktree + working directory override
-    if s.worktrees != nil {
-        project, perr := s.repo.GetProjectByID(ctx, thread.ProjectID)
-        if perr != nil {
-            return nil, discovery.Thread{}, perr
-        }
-        wtPath, workingDir, _, werr := s.worktrees.EnsureForThread(ctx, project.Path, thread.ID)
-        if werr != nil {
-            return nil, discovery.Thread{}, werr
-        }
-        _ = s.repo.UpdateThreadWorktreePath(ctx, thread.ID, wtPath)
-        thread.WorktreePath = wtPath
-        req.ThreadOptions.WorkingDirectory = workingDir
-        req.ThreadOptions.SkipGitRepoCheck = false
-    }
+	// Ensure worktree + working directory override
+	if s.worktrees != nil {
+		project, perr := s.repo.GetProjectByID(ctx, thread.ProjectID)
+		if perr != nil {
+			return nil, discovery.Thread{}, perr
+		}
+		wtPath, workingDir, _, werr := s.worktrees.EnsureForThread(ctx, project.Path, thread.ID)
+		if werr != nil {
+			return nil, discovery.Thread{}, werr
+		}
+		_ = s.repo.UpdateThreadWorktreePath(ctx, thread.ID, wtPath)
+		thread.WorktreePath = wtPath
+		req.ThreadOptions.WorkingDirectory = workingDir
+		req.ThreadOptions.SkipGitRepoCheck = false
+	}
 
 	userContent := deriveUserMessageText(req)
 	hasSegments := len(req.Segments) > 0
@@ -224,10 +238,10 @@ func (s *Service) Send(ctx context.Context, req MessageRequest) (*Stream, discov
 		return nil, discovery.Thread{}, err
 	}
 
-    state := newStreamPersistence(s.repo, thread)
+	state := newStreamPersistence(s.repo, thread)
 
-    events := make(chan StreamEvent)
-    done := make(chan error, 1)
+	events := make(chan StreamEvent)
+	done := make(chan error, 1)
 
 	streamID := uuid.NewString()
 
@@ -356,9 +370,9 @@ func (s *Service) processEvent(ctx context.Context, state *streamPersistence, ev
 }
 
 func (s *Service) unregisterActive(streamID string) {
-    s.activeMu.Lock()
-    delete(s.active, streamID)
-    s.activeMu.Unlock()
+	s.activeMu.Lock()
+	delete(s.active, streamID)
+	s.activeMu.Unlock()
 }
 
 // Cancel stops an active stream and returns the new thread status.
@@ -414,6 +428,21 @@ func (s *Service) GetThread(ctx context.Context, id int64) (ThreadDTO, error) {
 	return toThreadDTO(record), nil
 }
 
+// ListThreadDiffStats returns git diff statistics for a thread worktree.
+func (s *Service) ListThreadDiffStats(ctx context.Context, threadID int64) ([]FileDiffStatDTO, error) {
+	if err := s.ensureRepo(); err != nil {
+		return nil, err
+	}
+	thread, err := s.repo.GetThread(ctx, threadID)
+	if err != nil {
+		return nil, err
+	}
+	if strings.TrimSpace(thread.WorktreePath) == "" {
+		return nil, fmt.Errorf("thread %d has no worktree", threadID)
+	}
+	return collectGitDiffStats(ctx, thread.WorktreePath)
+}
+
 // LoadThreadConversation returns the persisted transcript for a thread.
 func (s *Service) LoadThreadConversation(ctx context.Context, threadID int64) ([]ConversationEntryDTO, error) {
 	if err := s.ensureRepo(); err != nil {
@@ -461,116 +490,116 @@ func (s *Service) RenameThread(ctx context.Context, id int64, title string) (Thr
 
 // DeleteThread removes a thread and its persisted conversation.
 func (s *Service) DeleteThread(ctx context.Context, id int64) error {
-    if err := s.ensureRepo(); err != nil {
-        return err
-    }
-    // Load thread to get worktree path before deleting
-    thread, getErr := s.repo.GetThread(ctx, id)
-    if getErr != nil {
-        if errors.Is(getErr, sql.ErrNoRows) {
-            return fmt.Errorf("thread %d not found", id)
-        }
-        return getErr
-    }
-    // Best-effort remove worktree (branch retained by design)
-    if s.worktrees != nil && strings.TrimSpace(thread.WorktreePath) != "" {
-        _ = s.worktrees.RemoveForThread(ctx, thread.WorktreePath)
-    }
-    if err := s.repo.DeleteThread(ctx, id); err != nil {
-        if errors.Is(err, sql.ErrNoRows) {
-            return fmt.Errorf("thread %d not found", id)
-        }
-        return err
-    }
-    return nil
+	if err := s.ensureRepo(); err != nil {
+		return err
+	}
+	// Load thread to get worktree path before deleting
+	thread, getErr := s.repo.GetThread(ctx, id)
+	if getErr != nil {
+		if errors.Is(getErr, sql.ErrNoRows) {
+			return fmt.Errorf("thread %d not found", id)
+		}
+		return getErr
+	}
+	// Best-effort remove worktree (branch retained by design)
+	if s.worktrees != nil && strings.TrimSpace(thread.WorktreePath) != "" {
+		_ = s.worktrees.RemoveForThread(ctx, thread.WorktreePath)
+	}
+	if err := s.repo.DeleteThread(ctx, id); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return fmt.Errorf("thread %d not found", id)
+		}
+		return err
+	}
+	return nil
 }
 
 // StartWorktreeCleanup launches a periodic cleanup goroutine that removes
 // worktree directories whose threads no longer exist. Interval defaults to 1h
 // if zero or negative.
 func (s *Service) StartWorktreeCleanup(interval time.Duration) {
-    if s.worktrees == nil {
-        return
-    }
-    if interval <= 0 {
-        interval = time.Hour
-    }
-    if s.cleanupStop != nil {
-        return // already running
-    }
-    stop := make(chan struct{})
-    s.cleanupStop = stop
-    ticker := time.NewTicker(interval)
-    go func() {
-        defer ticker.Stop()
-        for {
-            select {
-            case <-ticker.C:
-                _ = s.cleanupOrphanWorktrees(context.Background())
-            case <-stop:
-                return
-            }
-        }
-    }()
+	if s.worktrees == nil {
+		return
+	}
+	if interval <= 0 {
+		interval = time.Hour
+	}
+	if s.cleanupStop != nil {
+		return // already running
+	}
+	stop := make(chan struct{})
+	s.cleanupStop = stop
+	ticker := time.NewTicker(interval)
+	go func() {
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ticker.C:
+				_ = s.cleanupOrphanWorktrees(context.Background())
+			case <-stop:
+				return
+			}
+		}
+	}()
 }
 
 // StopWorktreeCleanup stops the background cleanup worker if running.
 func (s *Service) StopWorktreeCleanup() {
-    if s.cleanupStop != nil {
-        close(s.cleanupStop)
-        s.cleanupStop = nil
-    }
+	if s.cleanupStop != nil {
+		close(s.cleanupStop)
+		s.cleanupStop = nil
+	}
 }
 
 func (s *Service) isThreadActive(threadID int64) bool {
-    s.activeMu.Lock()
-    defer s.activeMu.Unlock()
-    for _, a := range s.active {
-        if a.threadID == threadID {
-            return true
-        }
-    }
-    return false
+	s.activeMu.Lock()
+	defer s.activeMu.Unlock()
+	for _, a := range s.active {
+		if a.threadID == threadID {
+			return true
+		}
+	}
+	return false
 }
 
 func (s *Service) cleanupOrphanWorktrees(ctx context.Context) error {
-    root := strings.TrimSpace(s.worktrees.Root())
-    if root == "" {
-        return nil
-    }
-    projectDirs, err := os.ReadDir(root)
-    if err != nil {
-        return nil
-    }
-    for _, pd := range projectDirs {
-        if !pd.IsDir() {
-            continue
-        }
-        projectPath := filepath.Join(root, pd.Name())
-        threadDirs, err := os.ReadDir(projectPath)
-        if err != nil {
-            continue
-        }
-        for _, td := range threadDirs {
-            if !td.IsDir() {
-                continue
-            }
-            // parse numeric id
-            id, perr := strconv.ParseInt(td.Name(), 10, 64)
-            if perr != nil || id <= 0 {
-                continue
-            }
-            if s.isThreadActive(id) {
-                continue
-            }
-            // Does thread exist?
-            if _, err := s.repo.GetThread(ctx, id); err != nil {
-                if errors.Is(err, sql.ErrNoRows) {
-                    // orphan → remove worktree
-                    _ = s.worktrees.RemoveForThread(ctx, filepath.Join(projectPath, td.Name()))
-                }
-            }
-        }
-    }
-    return nil
+	root := strings.TrimSpace(s.worktrees.Root())
+	if root == "" {
+		return nil
+	}
+	projectDirs, err := os.ReadDir(root)
+	if err != nil {
+		return nil
+	}
+	for _, pd := range projectDirs {
+		if !pd.IsDir() {
+			continue
+		}
+		projectPath := filepath.Join(root, pd.Name())
+		threadDirs, err := os.ReadDir(projectPath)
+		if err != nil {
+			continue
+		}
+		for _, td := range threadDirs {
+			if !td.IsDir() {
+				continue
+			}
+			// parse numeric id
+			id, perr := strconv.ParseInt(td.Name(), 10, 64)
+			if perr != nil || id <= 0 {
+				continue
+			}
+			if s.isThreadActive(id) {
+				continue
+			}
+			// Does thread exist?
+			if _, err := s.repo.GetThread(ctx, id); err != nil {
+				if errors.Is(err, sql.ErrNoRows) {
+					// orphan → remove worktree
+					_ = s.worktrees.RemoveForThread(ctx, filepath.Join(projectPath, td.Name()))
+				}
+			}
+		}
+	}
+	return nil
 }

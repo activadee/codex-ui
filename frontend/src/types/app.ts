@@ -13,6 +13,7 @@ export type AgentThread = {
   id: number
   projectId: number
   externalId?: string
+  worktreePath?: string
   title: string
   model: string
   sandboxMode: string
@@ -23,6 +24,13 @@ export type AgentThread = {
   lastMessageAt?: string
   preview: string
   lastTimestamp: string
+}
+
+export type FileDiffStat = {
+  path: string
+  added: number
+  removed: number
+  status?: string
 }
 
 export type ThreadListItem = {

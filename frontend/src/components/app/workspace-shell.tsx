@@ -26,7 +26,7 @@ type WorkspaceShellProps = {
 
 export function WorkspaceShell({ sidebar, main, footer }: WorkspaceShellProps) {
   return (
-    <div className="flex h-screen bg-card text-foreground">
+    <div className="flex h-screen bg-white text-foreground">
       <ProjectSidebar
         projects={sidebar.projects}
         sections={sidebar.sections}
@@ -42,8 +42,8 @@ export function WorkspaceShell({ sidebar, main, footer }: WorkspaceShellProps) {
         onThreadDelete={sidebar.onThreadDelete}
       />
       <div className="flex flex-1 flex-col overflow-hidden">
-        <main className="flex-1 overflow-hidden">{main}</main>
-        {footer}
+        <main className="flex-1 min-h-0 overflow-hidden bg-white">{main}</main>
+        {footer && <div className="border-t border-border/70 bg-white">{footer}</div>}
       </div>
     </div>
   )

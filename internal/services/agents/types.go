@@ -77,6 +77,14 @@ type FileChangeDTO struct {
 	Status string `json:"status"`
 }
 
+// FileDiffStatDTO summarises total additions/removals for a tracked file.
+type FileDiffStatDTO struct {
+	Path    string `json:"path"`
+	Added   int    `json:"added"`
+	Removed int    `json:"removed"`
+	Status  string `json:"status,omitempty"`
+}
+
 // ToolCallDTO summarises an MCP tool invocation.
 type ToolCallDTO struct {
 	Server string `json:"server"`
@@ -143,6 +151,7 @@ type ThreadDTO struct {
 	ID             int64   `json:"id"`
 	ProjectID      int64   `json:"projectId"`
 	ExternalID     string  `json:"externalId,omitempty"`
+	WorktreePath   string  `json:"worktreePath,omitempty"`
 	Title          string  `json:"title"`
 	Model          string  `json:"model"`
 	SandboxMode    string  `json:"sandboxMode"`
