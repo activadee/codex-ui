@@ -52,7 +52,7 @@ export function useThreadTerminal(threadId?: number): UseThreadTerminalResponse 
     })
   }, [])
 
- const start = useCallback(async () => {
+  const start = useCallback(async () => {
     if (!threadId) {
       return
     }
@@ -159,48 +159,6 @@ export function useThreadTerminal(threadId?: number): UseThreadTerminalResponse 
       void StopThreadTerminal(threadId)
     }
   }, [broadcast, start, threadId])
-
-  useEffect(() => {
-    if (!threadId) {
-      if (listenerIdRef.current) {
-        listenerIdRef.current()
-        listenerIdRef.current = null
-      }
-      return
-    }
-    const topic = terminalTopic(threadId)
-    const handleEvent = (payload: TerminalWireEvent) => {
-      if (!payload || payload.threadId !== activeThreadRef.current) {
-        return
-      }
-      switch (payload.type) {
-        case "ready":
-          setStatus("ready")
-          broadcast({ type: "ready" })
-          break
-        case "output":
-          if (!payload.data) {
-            return
-          }
-          broadcast({ type: "output", data: decodeBase64(payload.data) })
-          break
-        case "exit":
-          setStatus("exited")
-          setExitStatus(payload.status ?? null)
-          broadcast({ type: "exit", status: payload.status })
-          break
-        default:
-          break
-      }
-    }
-    listenerIdRef.current = EventsOn(topic, handleEvent)
-    return () => {
-      if (listenerIdRef.current) {
-        listenerIdRef.current()
-        listenerIdRef.current = null
-      }
-    }
-  }, [broadcast, threadId])
 
   const subscribe = useCallback((listener: (event: TerminalListenerEvent) => void) => {
     listenersRef.current.add(listener)
