@@ -60,7 +60,25 @@ export function useThreadTerminal(threadId?: number): UseThreadTerminalResponse 
     setExitStatus(null)
     setError(null)
     try {
-      await StartThreadTerminal(threadId)
+  const start = useCallback(async () => {
+    if (!threadId) {
+      return
+    }
+    const currentThreadId = threadId
+    setStatus("connecting")
+    setExitStatus(null)
+    setError(null)
+    try {
+      await StartThreadTerminal(currentThreadId)
+    } catch (err) {
+      if (activeThreadRef.current !== currentThreadId) {
+        return
+      }
+      const message = err instanceof Error ? err.message : "Failed to start terminal"
+      setError(message)
+      setStatus("error")
+    }
+  }, [threadId])
     } catch (err) {
       const message = err instanceof Error ? err.message : "Failed to start terminal"
       setError(message)
