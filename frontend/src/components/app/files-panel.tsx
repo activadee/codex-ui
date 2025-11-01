@@ -35,7 +35,7 @@ export function FilesPanel({ threadId }: FilesPanelProps) {
       try {
         const t: AgentThread = (await GetThread(threadId)) as unknown as AgentThread
         if (!active) return
-        setPrUrl(t?.prUrl)
+        setPrUrl(t?.prUrl ?? undefined)
       } catch (e) {
         if (!active) return
         // Non-fatal for showing buttons

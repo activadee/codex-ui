@@ -21,6 +21,17 @@ export function mapThreadDtoToThread(dto: agents.ThreadDTO): AgentThread {
     projectId: dto.projectId,
     externalId: dto.externalId,
     worktreePath: dto.worktreePath,
+    branchName: dto.branchName || undefined,
+    prUrl: dto.prUrl || undefined,
+    branch: dto.branch || dto.branchName || undefined,
+    pullRequestNumber:
+      typeof dto.pullRequestNumber === "number" ? dto.pullRequestNumber : undefined,
+    diffStat: dto.diffStat
+      ? {
+          added: dto.diffStat.added ?? 0,
+          removed: dto.diffStat.removed ?? 0
+        }
+      : undefined,
     title: dto.title,
     model: dto.model,
     sandboxMode: dto.sandboxMode,
@@ -122,11 +133,15 @@ export function threadToListItem(thread: AgentThread): ThreadListItem {
     preview: thread.preview,
     timestamp: formatted,
     relativeTimestamp: formatRelativeTime(timestampSource),
+    lastActivityAt: timestampSource,
     model: thread.model,
     status: thread.status,
     statusLabel: getStatusLabel(thread.status),
     progressText: buildProgressText(thread.status, timestampSource),
-    meta: `Model · ${thread.model}`
+    meta: `Model · ${thread.model}`,
+    branch: thread.branch ?? thread.branchName ?? undefined,
+    pullRequestNumber: thread.pullRequestNumber,
+    diffStat: thread.diffStat
   }
 }
 
