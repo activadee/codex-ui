@@ -74,21 +74,16 @@ export function useAgentStream(options: UseAgentStreamOptions = {}) {
         updateThreadState(threadId, (prev) => ({ ...prev, usage: event.usage }))
       }
 
-      if (event.error?.message) {
-        const message = event.error.message
-        updateThreadState(threadId, (prev) => ({
-          ...prev,
-          status: "error",
-          error: message,
-          streamId: undefined
-        }))
-        cleanupListener(streamId)
-        streamThreadMap.current.delete(streamId)
-        if (optionsRef.current.onError) {
-          optionsRef.current.onError(message, context)
-        }
-        return
-      }
+      if (event.error?.message) {  
+        const message = event.error.message  
+        updateThreadState(threadId, (prev) => ({  
+          ...prev,  
+          status: "error",  
+          error: message  
+        }))  
+        optionsRef.current.onError?.(message, context)  
+      }  
+
 
       if (event.type === "stream.complete" || event.type === "stream.error") {
         cleanupListener(streamId)
