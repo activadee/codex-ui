@@ -2,23 +2,22 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useQueryClient } from "@tanstack/react-query"
 
 import { agents } from "../../wailsjs/go/models"
-import { DeleteAttachment, DeleteThread, LoadThreadConversation, RenameThread } from "../../wailsjs/go/main/App"
-import { formatThreadSections, mapThreadDtoToThread, threadToListItem, updateThreadPreview } from "@/lib/threads"
+import { DeleteAttachment, DeleteThread, RenameThread } from "../../wailsjs/go/main/App"
+import { mapThreadDtoToThread, threadToListItem } from "@/lib/threads"
 import type {
-  AgentConversationEntry,
   AgentItemPayload,
   AgentUsage,
-  ConversationEntry,
   SystemConversationEntry,
   ThreadListItem,
-  ThreadSection,
   UserConversationEntry,
   UserMessageSegment
 } from "@/types/app"
 import { useProjects } from "@/hooks/useProjects"
 import { useAgentThreads } from "@/hooks/useAgentThreads"
-import { useAgentStream } from "@/hooks/useAgentStream"
-import { useThreadConversation, normaliseConversation } from "@/hooks/useThreadConversation"
+import { useThreadConversation } from "@/hooks/useThreadConversation"
+import { useConversationManager } from "@/hooks/workspace/useConversationManager"
+import { useThreadSelection } from "@/hooks/workspace/useThreadSelection"
+import { useStreamLifecycle } from "@/hooks/workspace/useStreamLifecycle"
 
 type SendMessageOptions = {
   content: string
@@ -70,36 +69,6 @@ export function useWorkspaceController() {
 
   const queryClient = useQueryClient()
 
-  const ensureTimeline = useCallback(
-    (threadId: number) => {
-      if (threadId <= 0) {
-        return
-      }
-      queryClient.setQueryData<ConversationEntry[]>(["conversation", threadId], (prev) => prev ?? [])
-    },
-    [queryClient]
-  )
-
-  const getConversationEntries = useCallback(
-    (threadId: number): ConversationEntry[] => {
-      if (threadId <= 0) {
-        return []
-      }
-      return queryClient.getQueryData<ConversationEntry[]>(["conversation", threadId]) ?? []
-    },
-    [queryClient]
-  )
-
-  const updateConversationEntries = useCallback(
-    (threadId: number, updater: (entries: ConversationEntry[]) => ConversationEntry[]) => {
-      if (threadId <= 0) {
-        return
-      }
-      queryClient.setQueryData<ConversationEntry[]>(["conversation", threadId], (prev = []) => updater(prev))
-    },
-    [queryClient]
-  )
-
   const projectId = activeProject?.id ?? null
   const {
     threads,
@@ -109,248 +78,28 @@ export function useWorkspaceController() {
     setThreads
   } = useAgentThreads(projectId)
 
-  const applyThreadPreview = useCallback(
-    (threadId: number, text: string, timestamp: string) => {
-      if (!text.trim()) {
-        return
-      }
-      setThreads((prev) =>
-        prev.map((thread) => (thread.id === threadId ? updateThreadPreview(thread, text, timestamp) : thread))
-      )
-    },
-    [setThreads]
-  )
+  const conversationManager = useConversationManager({ threads, setThreads })
+  const { sections, loadConversation, appendUserEntry, upsertAgentEntry, appendSystemEntry, ensureTimeline, syncThreadPreviewFromConversation, getConversationEntries } = conversationManager
 
-  const applyPreviewFromEntries = useCallback(
-    (threadId: number, entries: ConversationEntry[]) => {
-      if (!entries.length) {
-        return
-      }
-      let previewText = ""
-      let timestamp = entries[entries.length - 1].createdAt
-      for (let index = entries.length - 1; index >= 0; index -= 1) {
-        const entry = entries[index]
-        if (entry.role === "agent" && entry.item) {
-          if (entry.item.type === "agent_message" && entry.item.text) {
-            previewText = entry.item.text
-            timestamp = entry.updatedAt ?? entry.createdAt
-            break
-          }
-          if (entry.item.reasoning) {
-            previewText = entry.item.reasoning
-            timestamp = entry.updatedAt ?? entry.createdAt
-            break
-          }
-        } else if (entry.role === "user") {
-          previewText = entry.text ?? ""
-          timestamp = entry.createdAt
-          break
-        }
-      }
-      if (previewText.trim()) {
-        applyThreadPreview(threadId, previewText, timestamp)
-      }
-    },
-    [applyThreadPreview]
-  )
-
-  const loadConversation = useCallback(
-    async (threadId: number) => {
-      if (threadId <= 0) {
-        return [] as ConversationEntry[]
-      }
-      try {
-        const response = await LoadThreadConversation(threadId)
-        const normalized = normaliseConversation(response)
-        queryClient.setQueryData<ConversationEntry[]>(["conversation", threadId], normalized)
-        applyPreviewFromEntries(threadId, normalized)
-        return normalized
-      } catch (error) {
-        console.error("Failed to load conversation", error)
-        return [] as ConversationEntry[]
-      }
-    },
-    [applyPreviewFromEntries, queryClient]
-  )
-
-  const appendUserEntry = useCallback(
-    (threadId: number, entry: UserConversationEntry) => {
-      ensureTimeline(threadId)
-      updateConversationEntries(threadId, (existing) => [...existing, entry])
-      if (entry.text.trim()) {
-        applyThreadPreview(threadId, entry.text, entry.createdAt)
-      }
-    },
-    [applyThreadPreview, ensureTimeline, updateConversationEntries]
-  )
-
-  const upsertAgentEntry = useCallback(
-    (threadId: number, item: AgentItemPayload) => {
-      const identifier = item.id && item.id.trim() ? item.id : `agent-${Date.now().toString(36)}`
-      const timestamp = new Date().toISOString()
-      ensureTimeline(threadId)
-      updateConversationEntries(threadId, (existing) => {
-        const index = existing.findIndex((entry) => entry.role === "agent" && entry.id === identifier)
-        if (index >= 0) {
-          const current = existing[index] as AgentConversationEntry
-          const nextEntry: AgentConversationEntry = {
-            ...current,
-            item: { ...item, id: identifier },
-            updatedAt: timestamp
-          }
-          const nextList = [...existing]
-          nextList[index] = nextEntry
-          return nextList
-        }
-        const nextEntry: AgentConversationEntry = {
-          id: identifier,
-          role: "agent",
-          createdAt: timestamp,
-          updatedAt: timestamp,
-          item: { ...item, id: identifier }
-        }
-        return [...existing, nextEntry]
-      })
-
-      if (item.type === "agent_message" && item.text) {
-        applyThreadPreview(threadId, item.text, timestamp)
-      }
-    },
-    [applyThreadPreview, ensureTimeline, updateConversationEntries]
-  )
-
-  const appendSystemEntry = useCallback(
-    (threadId: number, entry: SystemConversationEntry) => {
-      ensureTimeline(threadId)
-      updateConversationEntries(threadId, (existing) => [...existing, entry])
-    },
-    [ensureTimeline, updateConversationEntries]
-  )
-
-  const syncThreadPreviewFromConversation = useCallback(
-    (threadId: number) => {
-      const entries = getConversationEntries(threadId)
-      if (!entries || entries.length === 0) {
-        return
-      }
-      applyPreviewFromEntries(threadId, entries)
-    },
-    [applyPreviewFromEntries, getConversationEntries]
-  )
-
-  const sections = useMemo<ThreadSection[]>(() => formatThreadSections(threads), [threads])
-
-  const [activeThread, setActiveThread] = useState<ThreadListItem | null>(null)
-
-  useEffect(() => {
-    if (!threads.length) {
-      setActiveThread(null)
-      return
-    }
-    setActiveThread((prev) => {
-      if (prev) {
-        const existing = threads.find((thread) => thread.id === prev.id)
-        if (existing) {
-          return threadToListItem(existing)
-        }
-      }
-      return threadToListItem(threads[0])
-    })
-  }, [threads])
-
-  const threadId = activeThread?.id ?? null
+  const { activeThread, setActiveThread, threadId, selectedThread, handleThreadSelect } = useThreadSelection(threads)
   const { entries: conversationEntries } = useThreadConversation(threadId)
 
 
-  const { startStream, cancelStream, getThreadState } = useAgentStream({
-    onEvent: (event, context) => {
-      const targetThreadId = context.threadId ?? threadId ?? undefined
-      if (!targetThreadId) {
-        return
-      }
-      ensureTimeline(targetThreadId)
-
-      if (event.type === "turn.started") {
-        const entry: SystemConversationEntry = {
-          id: `system-${Date.now().toString(36)}`,
-          role: "system",
-          createdAt: new Date().toISOString(),
-          tone: "info",
-          message: "Assistant started thinking"
-        }
-        appendSystemEntry(targetThreadId, entry)
-      }
-
-      if (event.item) {
-        upsertAgentEntry(targetThreadId, event.item)
-      }
-
-      if (event.type === "turn.completed") {
-        const entry: SystemConversationEntry = {
-          id: `system-${Date.now().toString(36)}`,
-          role: "system",
-          createdAt: new Date().toISOString(),
-          tone: "info",
-          message: formatUsageSummary(event.usage)
-        }
-        appendSystemEntry(targetThreadId, entry)
-      }
-
-      if (event.error?.message) {
-        const entry: SystemConversationEntry = {
-          id: `system-${Date.now().toString(36)}`,
-          role: "system",
-          createdAt: new Date().toISOString(),
-          tone: "error",
-          message: event.error.message
-        }
-        appendSystemEntry(targetThreadId, entry)
-      }
-    },
-    onComplete: async (threadIdFromStream, statusMessage, streamId) => {
-      if (streamId) {
-        const attachments = pendingAttachmentsRef.current.get(streamId) ?? []
-        if (attachments.length > 0) {
-          pendingAttachmentsRef.current.delete(streamId)
-          await Promise.all(
-            attachments.map(async (path) => {
-              try {
-                await DeleteAttachment(path)
-              } catch (error) {
-                console.error("Failed to delete stream attachment", error)
-              }
-            })
-          )
-        }
-      }
-
-      updateStreamError(null, threadIdFromStream)
-      const record = await refreshThread(threadIdFromStream)
-      const listItem = threadToListItem(record)
-      setActiveThread(listItem)
-
-      await loadConversation(threadIdFromStream)
-
-      if (statusMessage && statusMessage.trim()) {
-        const entry: SystemConversationEntry = {
-          id: `system-${Date.now().toString(36)}`,
-          role: "system",
-          createdAt: new Date().toISOString(),
-          tone: statusMessage === "error" ? "error" : "info",
-          message: statusMessage
-        }
-        appendSystemEntry(threadIdFromStream, entry)
-      }
-    },
-    onError: (message, context) => {
-      updateStreamError(message, context.threadId)
-    }
+  const streamLifecycle = useStreamLifecycle({
+    activeThreadId: threadId,
+    appendSystemEntry,
+    upsertAgentEntry,
+    ensureTimeline,
+    appendUserEntry,
+    loadConversation,
+    refreshThread,
+    setActiveThread,
+    syncThreadPreviewFromConversation,
+    updateStreamError,
+    pendingAttachmentsRef
   })
 
-  const threadStreamState = useMemo(
-    () => getThreadState(threadId ?? undefined),
-    [getThreadState, threadId]
-  )
+  const { startStream, cancelStream, threadStreamState, getThreadState } = streamLifecycle
   const isThreadStreaming = threadStreamState.status === "streaming"
 
   useEffect(() => {
@@ -363,13 +112,6 @@ export function useWorkspaceController() {
     }
     void loadConversation(threadId)
   }, [ensureTimeline, isThreadStreaming, loadConversation, threadId])
-
-  const handleThreadSelect = useCallback(
-    (thread: ThreadListItem) => {
-      setActiveThread(thread)
-    },
-    []
-  )
 
   const handleNewThread = useCallback(() => {
     setActiveThread(null)
@@ -484,13 +226,6 @@ export function useWorkspaceController() {
       })
     }
   }, [])
-
-  const selectedThread = useMemo(() => {
-    if (!activeThread) {
-      return null
-    }
-    return threads.find((thread) => thread.id === activeThread.id) ?? null
-  }, [activeThread, threads])
 
   const renameThread = useCallback(
     async (thread: ThreadListItem, title: string) => {

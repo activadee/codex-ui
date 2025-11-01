@@ -1,27 +1,25 @@
-import { createContext, useContext, useEffect, useRef, type ReactNode } from "react"
-
-import { EventsOff, EventsOn } from "../../wailsjs/runtime/runtime"
+import { EventsOff, EventsOn } from "../../../wailsjs/runtime/runtime"
 import { fileChangeTopic, streamTopic, terminalTopic } from "@/lib/threads"
 import type { FileDiffStat, StreamEventPayload } from "@/types/app"
 
-type StreamEventContext = {
+export type StreamEventContext = {
   threadId: number
   streamId: string
 }
 
-type StreamEventListener = (event: StreamEventPayload, context: StreamEventContext) => void
+export type StreamEventListener = (event: StreamEventPayload, context: StreamEventContext) => void
 
-type StreamHandleLike = {
+export type StreamHandleLike = {
   streamId?: string
   threadId: number
 }
 
-type FileDiffEvent = {
+export type FileDiffEvent = {
   threadId: number
   files: FileDiffStat[]
 }
 
-type TerminalEvent = {
+export type TerminalEvent = {
   threadId: number
   type: "ready" | "output" | "exit"
   data?: string
@@ -302,36 +300,3 @@ export class ThreadEventRouter {
     return parsed
   }
 }
-
-const ThreadEventRouterContext = createContext<ThreadEventRouter | null>(null)
-
-type ThreadEventRouterProviderProps = {
-  children: ReactNode
-}
-
-export function ThreadEventRouterProvider({ children }: ThreadEventRouterProviderProps) {
-  const routerRef = useRef<ThreadEventRouter | null>(null)
-
-  if (!routerRef.current) {
-    routerRef.current = new ThreadEventRouter()
-  }
-
-  useEffect(() => {
-    const router = routerRef.current
-    return () => {
-      router?.dispose()
-    }
-  }, [])
-
-  return <ThreadEventRouterContext.Provider value={routerRef.current}>{children}</ThreadEventRouterContext.Provider>
-}
-
-export function useThreadEventRouter(): ThreadEventRouter {
-  const value = useContext(ThreadEventRouterContext)
-  if (!value) {
-    throw new Error("useThreadEventRouter must be used within a ThreadEventRouterProvider")
-  }
-  return value
-}
-
-export type { StreamEventContext, FileDiffEvent, TerminalEvent }
