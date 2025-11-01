@@ -1,5 +1,6 @@
 import { WorkspacePanel } from "@/components/app/workspace-panel"
 import { Button } from "@/components/ui/button"
+import { Plus } from "lucide-react"
 import type { Project, ThreadListItem, ThreadSection } from "@/types/app"
 import { ProjectList } from "@/components/app/project-sidebar/project-list"
 import { ThreadSections } from "@/components/app/project-sidebar/thread-sections"
@@ -43,12 +44,14 @@ export function ProjectSidebar({
         actions={
           <Button
             variant="ghost"
-            size="sm"
-            className="h-7 gap-2"
+            size="icon"
+            className="h-7 w-7"
             onClick={onAddProject}
             disabled={isLoadingProjects}
+            aria-label="Add project"
+            title="Add project"
           >
-            Add
+            <Plus className="h-4 w-4" />
           </Button>
         }
         bodyClassName="flex h-full min-h-0 flex-col gap-3 px-3 py-3"
@@ -70,8 +73,15 @@ export function ProjectSidebar({
         title="Threads"
         className="flex h-1/2 flex-col"
         actions={
-          <Button variant="default" size="sm" className="h-7 rounded-md px-3" onClick={onNewThread}>
-            New
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-7 w-7"
+            onClick={onNewThread}
+            aria-label="New thread"
+            title="New thread"
+          >
+            <Plus className="h-4 w-4" />
           </Button>
         }
         bodyClassName="flex h-full min-h-0 flex-col px-3 py-3"
