@@ -32,7 +32,7 @@ func (m *Manager) Root() string { return m.root }
 // EnsureForThread creates or reuses a worktree for the given project and thread.
 // Returns the absolute worktree path, the working directory inside the worktree
 // (accounting for subdirectory projects), and the repository root.
-func (m *Manager) EnsureForThread(ctx context.Context, projectPath string, threadID int64) (string, string, string, error) {
+func (m *Manager) EnsureForThread(ctx context.Context, projectPath string, threadID int64, nameHint string, branchName string) (string, string, string, error) {
     if strings.TrimSpace(projectPath) == "" {
         return "", "", "", fmt.Errorf("project path is required")
     }
@@ -43,7 +43,22 @@ func (m *Manager) EnsureForThread(ctx context.Context, projectPath string, threa
     }
 
     projectSlug := sanitizeSegment(filepath.Base(projectPath))
-    worktreePath := filepath.Join(m.root, projectSlug, strconv.FormatInt(threadID, 10))
+    trimmedHint := strings.TrimSpace(nameHint)
+    idSuffix := strconv.FormatInt(threadID, 10)
+    dirSuffix := idSuffix
+    if trimmedHint != "" {
+        dirSuffix = fmt.Sprintf("%s-%s", sanitizeSegment(trimmedHint), idSuffix)
+    }
+    worktreePath := filepath.Join(m.root, projectSlug, dirSuffix)
+    // Back-compat: if using a new suffix but old id-only worktree exists, reuse it
+    if dirSuffix != idSuffix {
+        oldPath := filepath.Join(m.root, projectSlug, idSuffix)
+        if st, err := os.Stat(oldPath); err == nil && st.IsDir() {
+            if m.isGitDir(ctx, oldPath) == nil {
+                worktreePath = oldPath
+            }
+        }
+    }
     if err := os.MkdirAll(filepath.Dir(worktreePath), 0o755); err != nil {
         return "", "", "", fmt.Errorf("ensure worktree parent: %w", err)
     }
@@ -54,12 +69,12 @@ func (m *Manager) EnsureForThread(ctx context.Context, projectPath string, threa
             // reuse existing
         } else {
             // try force re-add on top of existing content
-            if err := m.addWorktree(ctx, repoRoot, worktreePath, projectPath, threadID, true); err != nil {
+            if err := m.addWorktree(ctx, repoRoot, worktreePath, projectPath, threadID, branchName, true); err != nil {
                 return "", "", "", err
             }
         }
     } else {
-        if err := m.addWorktree(ctx, repoRoot, worktreePath, projectPath, threadID, false); err != nil {
+        if err := m.addWorktree(ctx, repoRoot, worktreePath, projectPath, threadID, branchName, false); err != nil {
             return "", "", "", err
         }
     }
@@ -100,12 +115,15 @@ func (m *Manager) RemoveForThread(ctx context.Context, worktreePath string) erro
     return nil
 }
 
-func (m *Manager) addWorktree(ctx context.Context, repoRoot, worktreePath, projectPath string, threadID int64, force bool) error {
+func (m *Manager) addWorktree(ctx context.Context, repoRoot, worktreePath, projectPath string, threadID int64, branchName string, force bool) error {
     baseRef, err := m.currentBranchOrHead(ctx, projectPath)
     if err != nil {
         return err
     }
-    branch := fmt.Sprintf("codex/thread/%d", threadID)
+    branch := strings.TrimSpace(branchName)
+    if branch == "" {
+        branch = fmt.Sprintf("codex/thread/%d", threadID)
+    }
     args := []string{"worktree", "add"}
     if force {
         args = append(args, "--force")
@@ -200,4 +218,3 @@ func sanitizeSegment(s string) string {
     }
     return strings.ToLower(s)
 }
-
