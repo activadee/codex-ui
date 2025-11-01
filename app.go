@@ -15,6 +15,7 @@ import (
 	goruntime "runtime"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 
 	"codex-ui/internal/services/agents"
@@ -842,7 +843,7 @@ func (a *App) forwardTerminalOutput(session *terminalSession) {
 			a.emitTerminalOutput(session.threadID, chunk)
 		}
 		if err != nil {
-			if !errors.Is(err, os.ErrClosed) && !errors.Is(err, io.EOF) {
+			if !errors.Is(err, os.ErrClosed) && !errors.Is(err, io.EOF) && !errors.Is(err, syscall.EIO) {
 				fmt.Printf("terminal read thread %d: %v\n", session.threadID, err)
 			}
 			return
