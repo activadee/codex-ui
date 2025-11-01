@@ -843,8 +843,12 @@ func (a *App) forwardTerminalOutput(session *terminalSession) {
 			a.emitTerminalOutput(session.threadID, chunk)
 		}
 		if err != nil {
-			if !errors.Is(err, os.ErrClosed) && !errors.Is(err, io.EOF) && !errors.Is(err, syscall.EIO) {
-				fmt.Printf("terminal read thread %d: %v\n", session.threadID, err)
+			if !errors.Is(err, os.ErrClosed) && !errors.Is(err, io.EOF) {
+				var errno syscall.Errno
+				// Ignore EIO (errno 5) on Unix-like systems when PTY is closed.
+				if !(goruntime.GOOS != "windows" && errors.As(err, &errno) && errno == syscall.Errno(5)) {
+					fmt.Printf("terminal read thread %d: %v\n", session.threadID, err)
+				}
 			}
 			return
 		}
