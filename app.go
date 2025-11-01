@@ -1,22 +1,22 @@
 package main
 
 import (
-	"context"
-	"database/sql"
-	"encoding/base64"
-	"errors"
-	"fmt"
-	"io"
-	"io/fs"
-	"mime"
-	"os"
-	"os/exec"
-	"path/filepath"
-	goruntime "runtime"
-	"strings"
-	"sync"
-	"syscall"
-	"time"
+    "context"
+    "database/sql"
+    "encoding/base64"
+    "errors"
+    "fmt"
+    "io"
+    "io/fs"
+    "mime"
+    "os"
+    "os/exec"
+    "path/filepath"
+    goruntime "runtime"
+    "strings"
+    "sync"
+    "syscall"
+    "time"
 
 	"codex-ui/internal/services/agents"
 	"codex-ui/internal/services/projects"
@@ -132,6 +132,90 @@ func (a *App) ListThreadFileDiffs(threadID int64) ([]agents.FileDiffStatDTO, err
 	a.ensureThreadWatcher(thread.ID, thread.WorktreePath)
 	return a.agentService.ListThreadDiffStats(context.Background(), threadID)
 }
+
+// CreatePullRequest commits pending changes, pushes a branch, and creates a GitHub PR.
+// Returns the PR URL. If a PR already exists and is stored, returns it without changes.
+func (a *App) CreatePullRequest(threadID int64) (string, error) {
+    if a.agentService == nil {
+        return "", fmt.Errorf("agent service not initialised")
+    }
+    // Load thread & short-circuit if PR already recorded
+    thread, err := a.agentService.GetThread(context.Background(), threadID)
+    if err != nil {
+        return "", err
+    }
+    if strings.TrimSpace(thread.PRURL) != "" {
+        return thread.PRURL, nil
+    }
+    // Ensure there are changes to create a PR for
+    diffs, err := a.agentService.ListThreadDiffStats(context.Background(), threadID)
+    if err != nil {
+        return "", err
+    }
+    if len(diffs) == 0 {
+        return "", fmt.Errorf("no file changes detected")
+    }
+
+    // Build agent request
+    instruction := buildCreatePRInstruction(thread.ID)
+    req := agents.MessageRequest{
+        ThreadID: thread.ID,
+        ThreadOptions: agents.ThreadOptionsDTO{
+            Model:          "gpt-5",
+            SandboxMode:    "danger-full-access",
+            ReasoningLevel: "minimal",
+        },
+        Input: instruction,
+    }
+
+    // Stream without emitting UI events; collect PR URL
+    stream, _, err := a.agentService.Send(context.Background(), req)
+    if err != nil {
+        return "", err
+    }
+    defer stream.Close()
+
+    var prURL string
+    for evt := range stream.Events() {
+        if url := agents.ExtractPRURLFromEvent(evt); url != "" {
+            prURL = url
+        }
+    }
+    if waitErr := stream.Wait(); waitErr != nil {
+        return "", waitErr
+    }
+    if strings.TrimSpace(prURL) == "" {
+        return "", fmt.Errorf("failed to detect PR URL from agent run")
+    }
+
+    // Persist PR URL and notify UI about diffs (likely reduced)
+    if err := a.repo.UpdateThreadPRURL(context.Background(), thread.ID, prURL); err != nil {
+        return "", err
+    }
+    a.emitThreadDiffUpdate(thread.ID)
+    return prURL, nil
+}
+
+func buildCreatePRInstruction(threadID int64) string {
+    // Deterministic, GitHub-only instruction. Final output must include PR_URL marker.
+    return fmt.Sprintf(`You are operating in a git worktree branch for this thread.
+Task:
+1) Review all staged and unstaged changes.
+2) Group logically and create conventional commits (feat|fix|chore|refactor|docs|test) with meaningful scope and messages.
+3) Push the branch 'codex/thread/%d' to origin and ensure upstream is set.
+4) Create or update a GitHub pull request from this branch against the default base branch.
+   - Use a conventional title.
+   - Write a clear, structured description that summarizes the changes.
+
+Constraints:
+- Prefer the GitHub CLI (gh). If a PR already exists for the branch, update it.
+- Do not print secrets or token values.
+
+Output:
+- After completion print exactly one line with: PR_URL: https://github.com/<owner>/<repo>/pull/<number>
+- Do not include any other lines after the PR_URL line.`, threadID)
+}
+
 
 // StartThreadTerminal starts or reuses a per-thread terminal session.
 func (a *App) StartThreadTerminal(threadID int64) (TerminalHandle, error) {
