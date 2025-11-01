@@ -133,7 +133,7 @@ export function useWorkspaceController() {
       list: conversationEntries
     },
     stream: {
-      isStreaming: isThreadStreaming || getThreadState(undefined).status === "streaming",
+      isStreaming: isThreadStreaming,
       status: streamStatus,
       usage: streamUsage,
       error: activeStreamError,
