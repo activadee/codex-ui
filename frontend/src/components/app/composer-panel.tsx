@@ -184,22 +184,25 @@ export function ComposerPanel({
                   type="button"
                   onClick={onStop}
                   variant="secondary"
-                  className="h-9 rounded-full px-4"
+                  size="icon"
+                  className="h-8 w-8 rounded-full"
+                  title="Stop"
                 >
                   <Square className="h-4 w-4" />
-                  Stop
                 </Button>
               )}
-              <Button
-                type="button"
-                onClick={onSend}
-                disabled={actionDisabled}
-                className="h-9 rounded-full px-5"
-                title="Send"
-              >
-                <SendHorizonal className="mr-2 h-4 w-4" />
-                Send
-              </Button>
+              {!isStreaming && (
+                <Button
+                  type="button"
+                  onClick={onSend}
+                  disabled={actionDisabled}
+                  size="icon"
+                  className="h-8 w-8 rounded-full"
+                  title="Send"
+                >
+                  <SendHorizonal className="h-4 w-4" />
+                </Button>
+              )}
             </div>
           </div>
         </div>
