@@ -17,9 +17,11 @@ export function FilesPanel({ threadId }: FilesPanelProps) {
     void refresh()
   }, [refresh])
 
+  const title = files.length > 0 ? `Files (${files.length})` : "Files"
+
   return (
     <WorkspacePanel
-      title="Files"
+      title={title}
       actions={
         <Button
           size="icon"
