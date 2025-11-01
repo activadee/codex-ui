@@ -190,7 +190,8 @@ export function useAgentStream(options: UseAgentStreamOptions = {}) {
   const getThreadState = useCallback(
     (threadId?: number): ThreadStreamState => {
       if (!threadId) {
-        return idleState
+        const active = Object.values(threadStates).find((state) => state.status === "streaming")
+        return active ?? idleState
       }
       return threadStates[threadId] ?? idleState
     },
