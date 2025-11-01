@@ -1,18 +1,6 @@
-import { Loader2, PowerIcon, RotateCcw } from "lucide-react"
-import { useCallback, useEffect, useMemo, useRef } from "react"
+import { useCallback, useEffect, useRef } from "react"
 import { FitAddon } from "@xterm/addon-fit"
 import { Terminal } from "@xterm/xterm"
-
-import { WorkspacePanel } from "@/components/app/workspace-panel"
-import { Button } from "@/components/ui/button"
-import { useThreadTerminal } from "@/hooks/useThreadTerminal"
-import { cn } from "@/lib/utils"
-
-import "@xterm/xterm/css/xterm.css"
-
-type ThreadTerminalProps = {
-  threadId?: number
-}
 
 const terminalTheme = {
   background: "#0f172a",
@@ -29,14 +17,24 @@ const terminalTheme = {
   yellow: "#facc15"
 }
 
-export function ThreadTerminal({ threadId }: ThreadTerminalProps) {
+type TerminalEvent =
+  | { type: "output"; data: Uint8Array }
+  | { type: "ready" }
+  | { type: "exit"; status?: string }
+
+type TerminalViewportOptions = {
+  threadId?: number
+  subscribe: (listener: (event: TerminalEvent) => void) => () => void
+  resize: (cols: number, rows: number) => Promise<void>
+  send: (data: string) => Promise<void>
+}
+
+export function useTerminalViewport({ threadId, subscribe, resize, send }: TerminalViewportOptions) {
   const containerRef = useRef<HTMLDivElement | null>(null)
   const terminalRef = useRef<Terminal | null>(null)
   const fitAddonRef = useRef<FitAddon | null>(null)
   const lastSizeRef = useRef<{ cols: number; rows: number } | null>(null)
   const resizeFrameRef = useRef<number | null>(null)
-
-  const { status, error, exitStatus, start, stop, send, resize, subscribe } = useThreadTerminal(threadId)
   const sendRef = useRef(send)
 
   const scheduleFit = useCallback(
@@ -84,21 +82,6 @@ export function ThreadTerminal({ threadId }: ThreadTerminalProps) {
     },
     [resize]
   )
-
-  const statusLabel = useMemo(() => {
-    switch (status) {
-      case "connecting":
-        return "Connecting"
-      case "ready":
-        return "Connected"
-      case "exited":
-        return exitStatus ? exitStatus : "Exited"
-      case "error":
-        return error ?? "Error"
-      default:
-        return "Idle"
-    }
-  }, [error, exitStatus, status])
 
   useEffect(() => {
     sendRef.current = send
@@ -172,76 +155,5 @@ export function ThreadTerminal({ threadId }: ThreadTerminalProps) {
     }
   }, [threadId])
 
-  const showSpinner = status === "connecting"
-  const canRestart = status === "exited" || status === "error"
-
-  return (
-    <WorkspacePanel
-      title="Terminal"
-      actions={
-        <div className="flex items-center gap-2 text-xs">
-          <StatusBadge status={status} label={statusLabel} isBusy={showSpinner} />
-          <Button
-            size="icon"
-            variant="ghost"
-            className="h-7 w-7"
-            onClick={() => void stop()}
-            disabled={!threadId || status === "idle" || status === "connecting"}
-            aria-label="Stop terminal"
-          >
-            <PowerIcon className="h-4 w-4" />
-          </Button>
-          <Button
-            size="icon"
-            variant="ghost"
-            className="h-7 w-7"
-            onClick={() => void start()}
-            disabled={!threadId || (!canRestart && status !== "idle")}
-            aria-label="Restart terminal"
-          >
-            {showSpinner ? <Loader2 className="h-4 w-4 animate-spin" /> : <RotateCcw className="h-4 w-4" />}
-          </Button>
-        </div>
-      }
-      bodyClassName="relative"
-    >
-      <div ref={containerRef} className="h-full w-full" />
-      {!threadId && (
-        <div className="absolute inset-0 flex items-center justify-center bg-background/80 text-xs text-muted-foreground">
-          Select a thread to open a terminal.
-        </div>
-      )}
-    </WorkspacePanel>
-  )
-}
-
-function StatusBadge({
-  status,
-  label,
-  isBusy
-}: {
-  status: string
-  label: string
-  isBusy: boolean
-}) {
-  const intent = (() => {
-    switch (status) {
-      case "ready":
-        return "text-emerald-500"
-      case "exited":
-        return "text-amber-500"
-      case "error":
-        return "text-rose-500"
-      case "connecting":
-        return "text-sky-500"
-      default:
-        return "text-muted-foreground"
-    }
-  })()
-
-  return (
-    <span className={cn("flex items-center gap-1 text-xs font-medium", intent)}>
-      {isBusy && <Loader2 className="h-3 w-3 animate-spin" />} {label}
-    </span>
-  )
+  return { containerRef }
 }

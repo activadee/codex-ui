@@ -17,117 +17,18 @@ import {
   DialogTitle
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
-import { BadgeCheck, Clock3, Flame, Rocket } from "lucide-react"
-
 import { cn } from "@/lib/utils"
-import type { ThreadListItem, ThreadSection } from "@/types/app"
+import type { ThreadListItem } from "@/types/app"
 
-export type ThreadSectionsProps = {
-  sections: ThreadSection[]
-  activeProject: { id: number } | null
-  activeThread: ThreadListItem | null
-  onThreadSelect: (thread: ThreadListItem) => void
-  onThreadRename: (thread: ThreadListItem, title: string) => Promise<void>
-  onThreadDelete: (thread: ThreadListItem) => Promise<void>
-}
-
-export function ThreadSections({
-  sections,
-  activeProject,
-  activeThread,
-  onThreadSelect,
-  onThreadRename,
-  onThreadDelete
-}: ThreadSectionsProps) {
-  if (!sections.length || !activeProject) {
-    return (
-      <div className="flex flex-1 min-h-[200px] flex-col items-center justify-center gap-2.5 rounded-lg border border-dashed border-border/70 bg-muted/40 px-4 text-center">
-        <p className="text-sm font-medium text-foreground">
-          {activeProject ? "No conversations yet" : "Select a project"}
-        </p>
-        <p className="text-xs text-muted-foreground">
-          {activeProject
-            ? "Once Codex ingests sessions for this workspace, they’ll show up here."
-            : "Pick a project or add a new one to start tracking conversations."}
-        </p>
-      </div>
-    )
-  }
-
-  return (
-    <div className="flex-1 min-h-0 overflow-y-auto pr-1">
-      <div className="space-y-4">
-        {sections.map((section) => (
-          <ThreadSectionList
-            key={section.label}
-            section={section}
-            activeThread={activeThread}
-            onThreadSelect={onThreadSelect}
-            onThreadRename={onThreadRename}
-            onThreadDelete={onThreadDelete}
-          />
-        ))}
-      </div>
-    </div>
-  )
-}
-
-function ThreadSectionList({
-  section,
-  activeThread,
-  onThreadSelect,
-  onThreadRename,
-  onThreadDelete
-}: {
-  section: ThreadSection
-  activeThread: ThreadListItem | null
-  onThreadSelect: (thread: ThreadListItem) => void
-  onThreadRename: (thread: ThreadListItem, title: string) => Promise<void>
-  onThreadDelete: (thread: ThreadListItem) => Promise<void>
-}) {
-  const icon = getSectionIcon(section.label)
-  return (
-    <div className="space-y-3">
-      <div className="flex items-center justify-between">
-        <div>
-          <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-muted-foreground">
-            {section.label}
-          </p>
-          {section.subtitle && (
-            <p className="mt-0.5 text-xs text-muted-foreground">{section.subtitle}</p>
-          )}
-        </div>
-        {icon}
-      </div>
-      <div className="space-y-1.5">
-        {section.threads.map((thread) => (
-          <ThreadListItemRow
-            key={thread.id}
-            thread={thread}
-            isActive={activeThread?.id === thread.id}
-            onSelect={onThreadSelect}
-            onRename={onThreadRename}
-            onDelete={onThreadDelete}
-          />
-        ))}
-      </div>
-    </div>
-  )
-}
-
-function ThreadListItemRow({
-  thread,
-  isActive,
-  onSelect,
-  onRename,
-  onDelete
-}: {
+type ThreadListItemRowProps = {
   thread: ThreadListItem
   isActive: boolean
   onSelect: (thread: ThreadListItem) => void
   onRename: (thread: ThreadListItem, title: string) => Promise<void>
   onDelete: (thread: ThreadListItem) => Promise<void>
-}) {
+}
+
+export function ThreadListItemRow({ thread, isActive, onSelect, onRename, onDelete }: ThreadListItemRowProps) {
   const detail = thread.relativeTimestamp || thread.timestamp
   const [isRenameDialogOpen, setIsRenameDialogOpen] = useState(false)
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
@@ -267,18 +168,5 @@ function StatusPill({ status }: { status: ThreadListItem["status"] }) {
     stopped: "bg-amber-500",
     failed: "bg-rose-500"
   }
-  return <span className={cn("h-2.5 w-2.5 shrink-0 rounded-full", colorMap[status] ?? "bg-muted-foreground")}></span>
-}
-
-function getSectionIcon(label: string) {
-  switch (label.toLowerCase()) {
-    case "in progress":
-      return <Rocket className="h-4 w-4 text-primary" />
-    case "archived":
-      return <Clock3 className="h-4 w-4 text-muted-foreground" />
-    case "older":
-      return <BadgeCheck className="h-4 w-4 text-emerald-500" />
-    default:
-      return <Flame className="h-4 w-4 text-amber-500" />
-  }
+  return <span className={cn("h-2.5 w-2.5 shrink-0 rounded-full", colorMap[status] ?? "bg-muted-foreground")} />
 }
