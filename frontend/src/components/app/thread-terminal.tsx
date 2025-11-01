@@ -1,5 +1,5 @@
 import { Loader2, PowerIcon, RotateCcw } from "lucide-react"
-import { useEffect, useMemo, useRef } from "react"
+import { useCallback, useEffect, useMemo, useRef } from "react"
 import { FitAddon } from "@xterm/addon-fit"
 import { Terminal } from "@xterm/xterm"
 
@@ -33,9 +33,57 @@ export function ThreadTerminal({ threadId }: ThreadTerminalProps) {
   const containerRef = useRef<HTMLDivElement | null>(null)
   const terminalRef = useRef<Terminal | null>(null)
   const fitAddonRef = useRef<FitAddon | null>(null)
+  const lastSizeRef = useRef<{ cols: number; rows: number } | null>(null)
+  const resizeFrameRef = useRef<number | null>(null)
 
   const { status, error, exitStatus, start, stop, send, resize, subscribe } = useThreadTerminal(threadId)
   const sendRef = useRef(send)
+
+  const scheduleFit = useCallback(
+    (flush = false) => {
+      if (!terminalRef.current || !fitAddonRef.current) {
+        return
+      }
+
+      const runFit = () => {
+        if (!terminalRef.current || !fitAddonRef.current) {
+          return
+        }
+        try {
+          fitAddonRef.current.fit()
+        } catch (error) {
+          console.error("Failed to fit terminal", error)
+          return
+        }
+        const cols = terminalRef.current.cols
+        const rows = terminalRef.current.rows
+        const lastSize = lastSizeRef.current
+        if (!lastSize || lastSize.cols !== cols || lastSize.rows !== rows) {
+          lastSizeRef.current = { cols, rows }
+          void resize(cols, rows)
+        }
+      }
+
+      if (flush) {
+        if (resizeFrameRef.current !== null) {
+          cancelAnimationFrame(resizeFrameRef.current)
+          resizeFrameRef.current = null
+        }
+        runFit()
+        return
+      }
+
+      if (resizeFrameRef.current !== null) {
+        return
+      }
+
+      resizeFrameRef.current = requestAnimationFrame(() => {
+        resizeFrameRef.current = null
+        runFit()
+      })
+    },
+    [resize]
+  )
 
   const statusLabel = useMemo(() => {
     switch (status) {
@@ -76,9 +124,10 @@ export function ThreadTerminal({ threadId }: ThreadTerminalProps) {
 
     terminalRef.current = terminal
     fitAddonRef.current = fitAddon
+    lastSizeRef.current = null
 
     terminal.open(containerRef.current)
-    tryFit(terminal, fitAddon, resize)
+    scheduleFit(true)
 
     const disposeOutput = subscribe((event) => {
       if (!terminalRef.current) {
@@ -98,10 +147,7 @@ export function ThreadTerminal({ threadId }: ThreadTerminalProps) {
     })
 
     const resizeObserver = new ResizeObserver(() => {
-      if (!terminalRef.current || !fitAddonRef.current) {
-        return
-      }
-      tryFit(terminalRef.current, fitAddonRef.current, resize)
+      scheduleFit()
     })
     resizeObserver.observe(containerRef.current)
 
@@ -109,11 +155,16 @@ export function ThreadTerminal({ threadId }: ThreadTerminalProps) {
       disposeOutput()
       dataListener.dispose()
       resizeObserver.disconnect()
+      if (resizeFrameRef.current !== null) {
+        cancelAnimationFrame(resizeFrameRef.current)
+        resizeFrameRef.current = null
+      }
       terminal.dispose()
       terminalRef.current = null
       fitAddonRef.current = null
+      lastSizeRef.current = null
     }
-  }, [resize, subscribe, threadId])
+  }, [resize, scheduleFit, subscribe, threadId])
 
   useEffect(() => {
     if (!threadId && terminalRef.current) {
@@ -193,15 +244,4 @@ function StatusBadge({
       {isBusy && <Loader2 className="h-3 w-3 animate-spin" />} {label}
     </span>
   )
-}
-
-function tryFit(terminal: Terminal, fitAddon: FitAddon, resize: (cols: number, rows: number) => Promise<void>) {
-  try {
-    fitAddon.fit()
-    const cols = terminal.cols
-    const rows = terminal.rows
-    void resize(cols, rows)
-  } catch (error) {
-    console.error("Failed to fit terminal", error)
-  }
 }
