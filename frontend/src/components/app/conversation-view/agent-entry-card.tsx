@@ -1,103 +1,16 @@
-import {
-  AlertTriangle,
-  CheckCircle2,
-  FileText,
-  Image as ImageIcon,
-  ListChecks,
-  Loader2,
-  LucideIcon,
-  MessageSquareText,
-  Search,
-  Sparkles,
-  TerminalSquare,
-  User
-} from "lucide-react"
+import { AlertTriangle, CheckCircle2, FileText, ListChecks, MessageSquareText, Search, Sparkles, TerminalSquare } from "lucide-react"
+import type { LucideIcon } from "lucide-react"
 
 import { cn } from "@/lib/utils"
-import type {
-  AgentConversationEntry,
-  ConversationEntry,
-  SystemConversationEntry,
-  UserConversationEntry
-} from "@/types/app"
+import type { AgentConversationEntry } from "@/types/app"
 
-type ConversationViewProps = {
-  entries: ConversationEntry[]
-  isStreaming: boolean
-  streamStatus: string
-  projectName: string
+import { formatTime } from "./utils"
+
+type AgentEntryCardProps = {
+  entry: AgentConversationEntry
 }
 
-export function ConversationView({ entries, isStreaming, streamStatus, projectName }: ConversationViewProps) {
-  const hasContent = entries.length > 0
-
-  if (!hasContent && !isStreaming) {
-    return (
-      <div className="flex min-w-0 flex-1 flex-col items-center justify-center gap-2 px-8 py-8 text-center text-sm text-muted-foreground">
-        <Sparkles className="h-5 w-5" />
-        <p>Open or start a conversation for {projectName} to see activity.</p>
-      </div>
-    )
-  }
-
-  return (
-    <div className="flex min-w-0 flex-1 min-h-0 overflow-hidden bg-white">
-      <div className="flex min-w-0 flex-1 min-h-0 flex-col">
-        <div className="flex min-w-0 flex-1 min-h-0 overflow-hidden">
-          <div className="min-w-0 flex-1 overflow-y-auto px-4 pb-6 pt-1 md:px-6 md:pb-8 md:pt-2">
-            <div className="mx-auto flex w-full max-w-5xl flex-col gap-3">
-              {entries.map((entry) => (
-                <ConversationEntryCard key={entry.id} entry={entry} />
-              ))}
-              {isStreaming && <StreamingIndicator status={streamStatus} />}
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  )
-}
-
-type ConversationEntryCardProps = {
-  entry: ConversationEntry
-}
-
-function ConversationEntryCard({ entry }: ConversationEntryCardProps) {
-  // Hide todo list entries; they are rendered in the sticky Todos panel
-  if (entry.role === "agent" && entry.item?.type === "todo_list") {
-    return null
-  }
-  switch (entry.role) {
-    case "user":
-      return <UserEntryCard entry={entry} />
-    case "agent":
-      return <AgentEntryCard entry={entry} />
-    case "system":
-      return <SystemEntryCard entry={entry} />
-    default:
-      return null
-  }
-}
-
-function UserEntryCard({ entry }: { entry: UserConversationEntry }) {
-  const timestamp = formatTime(entry.createdAt)
-
-  return (
-    <article className="min-w-0 w-full max-w-full overflow-hidden rounded-xl border border-border/60 bg-white px-4 py-3 shadow-sm">
-      <header className="flex items-center justify-between gap-2 text-[11px] font-semibold uppercase tracking-[0.22em] text-muted-foreground">
-        <span className="flex min-w-0 items-center gap-2">
-          <User className="h-4 w-4" aria-hidden /> You
-        </span>
-        <time className="shrink-0 text-[11px] tracking-wide text-muted-foreground/80">{timestamp}</time>
-      </header>
-      <div className="mt-2 max-w-full space-y-2 text-sm text-foreground">
-        {entry.text && <p className="whitespace-pre-wrap wrap-break-word leading-relaxed">{entry.text}</p>}
-      </div>
-    </article>
-  )
-}
-
-function AgentEntryCard({ entry }: { entry: AgentConversationEntry }) {
+export function AgentEntryCard({ entry }: AgentEntryCardProps) {
   const timestamp = formatTime(entry.updatedAt)
   const { item } = entry
 
@@ -114,40 +27,8 @@ function AgentEntryCard({ entry }: { entry: AgentConversationEntry }) {
         </span>
         <time className="shrink-0 text-[11px] tracking-wide text-muted-foreground/80">{timestamp}</time>
       </header>
-      <div className="mt-2 max-w-full space-y-2 text-sm text-foreground">
-        {renderAgentContent(item)}
-      </div>
+      <div className="mt-2 max-w-full space-y-2 text-sm text-foreground">{renderAgentContent(item)}</div>
     </article>
-  )
-}
-
-function SystemEntryCard({ entry }: { entry: SystemConversationEntry }) {
-  const timestamp = formatTime(entry.createdAt)
-  const isError = entry.tone === "error"
-
-  return (
-    <div
-      className={cn(
-        "flex min-w-0 w-full max-w-full items-center justify-between overflow-hidden rounded-xl border px-3 py-2 text-xs font-medium",
-        isError ? "border-destructive/40 bg-destructive/10 text-destructive" : "border-muted bg-muted/60 text-muted-foreground"
-      )}
-    >
-      <span className="flex min-w-0 flex-1 items-center gap-2">
-        {isError ? <AlertTriangle className="h-3.5 w-3.5" aria-hidden /> : <Sparkles className="h-3.5 w-3.5" aria-hidden />}
-        <span className="wrap-break-word">{entry.message}</span>
-      </span>
-      <time className="shrink-0 text-[11px] tracking-wide text-muted-foreground/80">{timestamp}</time>
-    </div>
-  )
-}
-
-function StreamingIndicator({ status }: { status: string }) {
-  const label = status === "streaming" ? "Assistant responding" : status
-  return (
-    <div className="flex min-w-0 w-full max-w-full items-center gap-2 overflow-hidden rounded-xl border border-primary/20 bg-primary/10 px-3 py-2 text-xs font-medium text-primary">
-      <Loader2 className="h-4 w-4 animate-spin" />
-      <span className="wrap-break-word">{label}</span>
-    </div>
   )
 }
 
@@ -196,7 +77,10 @@ function renderAgentContent(item: AgentConversationEntry["item"]) {
       return (
         <ul className="max-w-full space-y-2 text-xs">
           {item.fileDiffs.map((diff, idx) => (
-            <li key={`${diff.path}-${idx}`} className="flex min-w-0 items-center justify-between gap-3 rounded-md bg-white/80 px-3 py-2">
+            <li
+              key={`${diff.path}-${idx}`}
+              className="flex min-w-0 items-center justify-between gap-3 rounded-md bg-white/80 px-3 py-2"
+            >
               <span className="flex min-w-0 items-center gap-2 text-foreground">
                 <FileText className="h-3.5 w-3.5" />
                 <span className="break-all">{diff.path}</span>
@@ -241,8 +125,12 @@ function renderAgentContent(item: AgentConversationEntry["item"]) {
         <ul className="space-y-1 text-xs text-foreground max-w-full">
           {item.todoList.items.map((todo, idx) => (
             <li key={`${todo.text}-${idx}`} className="flex min-w-0 items-center gap-2">
-              <CheckCircle2 className={cn("h-3.5 w-3.5", todo.completed ? "text-primary" : "text-muted-foreground/60")} />
-              <span className={cn("wrap-break-word", todo.completed ? "line-through text-muted-foreground" : undefined)}>{todo.text}</span>
+              <CheckCircle2
+                className={cn("h-3.5 w-3.5", todo.completed ? "text-primary" : "text-muted-foreground/60")}
+              />
+              <span className={cn("wrap-break-word", todo.completed ? "line-through text-muted-foreground" : undefined)}>
+                {todo.text}
+              </span>
             </li>
           ))}
         </ul>
@@ -321,12 +209,4 @@ function selectAgentIcon(type: string): LucideIcon | null {
     default:
       return Sparkles
   }
-}
-
-function formatTime(value: string): string {
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) {
-    return ""
-  }
-  return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
 }

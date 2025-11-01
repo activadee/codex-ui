@@ -15,6 +15,7 @@ import (
 	goruntime "runtime"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 
 	"codex-ui/internal/services/agents"
@@ -843,7 +844,11 @@ func (a *App) forwardTerminalOutput(session *terminalSession) {
 		}
 		if err != nil {
 			if !errors.Is(err, os.ErrClosed) && !errors.Is(err, io.EOF) {
-				fmt.Printf("terminal read thread %d: %v\n", session.threadID, err)
+				var errno syscall.Errno
+				// Ignore EIO (errno 5) on Unix-like systems when PTY is closed.
+				if !(goruntime.GOOS != "windows" && errors.As(err, &errno) && errno == syscall.Errno(5)) {
+					fmt.Printf("terminal read thread %d: %v\n", session.threadID, err)
+				}
 			}
 			return
 		}

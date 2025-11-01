@@ -6,15 +6,7 @@ import {
   StopThreadTerminal,
   WriteThreadTerminal
 } from "../../wailsjs/go/main/App"
-import { EventsOn } from "../../wailsjs/runtime/runtime"
-import { terminalTopic } from "@/lib/threads"
-
-type TerminalWireEvent = {
-  threadId: number
-  type: "ready" | "output" | "exit"
-  data?: string
-  status?: string
-}
+import { useThreadEventRouter, type TerminalEvent } from "@/lib/thread-events"
 
 type TerminalListenerEvent =
   | { type: "ready" }
@@ -38,9 +30,9 @@ export function useThreadTerminal(threadId?: number): UseThreadTerminalResponse 
   const [status, setStatus] = useState<TerminalStatus>("idle")
   const [error, setError] = useState<string | null>(null)
   const [exitStatus, setExitStatus] = useState<string | null>(null)
-  const listenerIdRef = useRef<(() => void) | null>(null)
   const listenersRef = useRef(new Set<(event: TerminalListenerEvent) => void>())
   const activeThreadRef = useRef<number | undefined>(threadId)
+  const router = useThreadEventRouter()
 
   const broadcast = useCallback((event: TerminalListenerEvent) => {
     listenersRef.current.forEach((listener) => {
@@ -118,18 +110,13 @@ export function useThreadTerminal(threadId?: number): UseThreadTerminalResponse 
 
   useEffect(() => {
     activeThreadRef.current = threadId
-    if (listenerIdRef.current) {
-      listenerIdRef.current()
-      listenerIdRef.current = null
-    }
     if (!threadId) {
       setStatus("idle")
       setExitStatus(null)
       setError(null)
       return
     }
-    const topic = terminalTopic(threadId)
-    const handleEvent = (payload: TerminalWireEvent) => {
+    const unsubscribe = router.subscribeToTerminal(threadId, (payload: TerminalEvent) => {
       if (!payload || payload.threadId !== activeThreadRef.current) {
         return
       }
@@ -152,17 +139,13 @@ export function useThreadTerminal(threadId?: number): UseThreadTerminalResponse 
         default:
           break
       }
-    }
-    listenerIdRef.current = EventsOn(topic, handleEvent)
+    })
     void start()
     return () => {
-      if (listenerIdRef.current) {
-        listenerIdRef.current()
-        listenerIdRef.current = null
-      }
+      unsubscribe()
       void StopThreadTerminal(threadId)
     }
-  }, [broadcast, start, threadId])
+  }, [broadcast, router, start, threadId])
 
   const subscribe = useCallback((listener: (event: TerminalListenerEvent) => void) => {
     listenersRef.current.add(listener)

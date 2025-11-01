@@ -35,6 +35,7 @@ export type FileDiffStat = {
 
 export type ThreadListItem = {
   id: number
+  projectId: number
   title: string
   preview: string
   timestamp: string
