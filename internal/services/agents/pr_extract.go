@@ -5,10 +5,10 @@ import (
 )
 
 var (
-    // Explicit marker preferred
-    prMarkerRe = regexp.MustCompile(`(?mi)^PR_URL:\s+(https://github\.com/[^\s]+/pull/\d+)\b`)
-    // Fallback: any GitHub PR URL in text
-    prURLRe    = regexp.MustCompile(`https://github\.com/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+/pull/\d+`)
+    // Explicit marker preferred  
+    prMarkerRe = regexp.MustCompile(`(?mi)^PR_URL:\s+(https://github\.com/[^\s]+/pull/\d+)\b`)  
+    // Fallback: any GitHub PR URL in text  
+    prURLRe    = regexp.MustCompile(`https://github\.com/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+/pull/\d+`)  
 )
 
 // ExtractPRURLFromEvent tries to extract a GitHub PR URL from a stream event.

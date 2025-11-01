@@ -85,7 +85,7 @@ func (r *Repository) GetThread(ctx context.Context, id int64) (Thread, error) {
 		lastMessageAt   sql.NullTime
 	)
 	err := r.db.QueryRowContext(ctx, `
-            SELECT id, project_id, external_id, conversation_path, worktree_path, pr_url, branch_name title, model, sandbox_mode, reasoning_level, status, created_at, updated_at, last_message_at
+            SELECT id, project_id, external_id, conversation_path, worktree_path, pr_url, branch_name, title, model, sandbox_mode, reasoning_level, status, created_at, updated_at, last_message_at
             FROM threads
             WHERE id = ?
         `, id).Scan(&t.ID, &t.ProjectID, &externalID, &conversationRaw, &worktreePath, &prURL, &branchName, &t.Title, &t.Model, &t.SandboxMode, &t.ReasoningLevel, &t.Status, &t.CreatedAt, &t.UpdatedAt, &lastMessageAt)

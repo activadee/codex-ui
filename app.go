@@ -160,7 +160,7 @@ func (a *App) CreatePullRequest(threadID int64) (string, error) {
 		return "", fmt.Errorf("no file changes detected")
 	}
 
-	instruction := buildCreatePRInstruction(thread.ID)
+	instruction := buildCreatePRInstruction(thread.BranchName)
 	stream, err := a.startBackgroundPRStream(worktree, instruction)
 	if err != nil {
 		return "", err
@@ -192,13 +192,13 @@ func (a *App) CreatePullRequest(threadID int64) (string, error) {
 	return prURL, nil
 }
 
-func buildCreatePRInstruction(threadID int64) string {
+func buildCreatePRInstruction(branchName string) string {
 	// Deterministic, GitHub-only instruction. Final output must include PR_URL marker.
 	return fmt.Sprintf(`You are operating in a git worktree branch for this thread.
 Task:
 1) Review all staged and unstaged changes.
 2) Group logically and create conventional commits (feat|fix|chore|refactor|docs|test) with meaningful scope and messages.
-3) Push the branch 'codex/thread/%d' to origin and ensure upstream is set.
+3) Push the branch '%s' to origin and ensure upstream is set.
 4) Create or update a GitHub pull request from this branch against the default base branch.
    - Use a conventional title.
    - Write a clear, structured description that summarizes the changes.
@@ -209,7 +209,7 @@ Constraints:
 
 Output:
 - After completion print exactly one line with: PR_URL: https://github.com/<owner>/<repo>/pull/<number>
-- Do not include any other lines after the PR_URL line.`, threadID)
+- Do not include any other lines after the PR_URL line.`, branchName)
 }
 
 func (a *App) startBackgroundPRStream(worktree string, instruction string) (*agents.StreamResult, error) {
@@ -227,7 +227,9 @@ func (a *App) startBackgroundPRStream(worktree string, instruction string) (*age
 		},
 		Input: instruction,
 	}
-	return adapter.Stream(context.Background(), req)
+	ctx, _ := context.WithTimeout(context.Background(), 5*time.Minute)  
+
+	return adapter.Stream(ctx, req)
 }
 
 // StartThreadTerminal starts or reuses a per-thread terminal session.
