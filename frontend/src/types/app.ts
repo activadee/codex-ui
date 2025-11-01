@@ -14,6 +14,7 @@ export type AgentThread = {
   projectId: number
   externalId?: string
   worktreePath?: string
+  prUrl?: string
   title: string
   model: string
   sandboxMode: string
