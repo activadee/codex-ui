@@ -36,7 +36,16 @@ export function useWorkspaceController() {
   } = useAgentThreads(projectId)
 
   const conversationManager = useConversationManager({ threads, setThreads })
-  const { sections, loadConversation, appendUserEntry, upsertAgentEntry, appendSystemEntry, ensureTimeline, syncThreadPreviewFromConversation, getConversationEntries } = conversationManager
+  const {
+    sections,
+    loadConversation,
+    appendUserEntry,
+    upsertAgentEntry,
+    appendSystemEntry,
+    ensureTimeline,
+    syncThreadPreviewFromConversation,
+    getConversationEntries
+  } = conversationManager
 
   const { activeThread, setActiveThread, threadId, selectedThread, handleThreadSelect } = useThreadSelection(threads)
   const { entries: conversationEntries } = useThreadConversation(threadId)
@@ -56,18 +65,16 @@ export function useWorkspaceController() {
   })
 
   const { startStream, cancelStream, threadStreamState, getThreadState } = streamLifecycle
-  const isThreadStreaming = threadStreamState.status === "streaming"
+  const idleStreamState = { status: "idle", error: null } as ReturnType<typeof getThreadState>
+  const activeThreadStreamState = threadId ? threadStreamState : idleStreamState
+  const isThreadStreaming = activeThreadStreamState.status === "streaming"
 
   useEffect(() => {
     if (!threadId) {
       return
     }
     ensureTimeline(threadId)
-    if (isThreadStreaming) {
-      return
-    }
-    void loadConversation(threadId)
-  }, [ensureTimeline, isThreadStreaming, loadConversation, threadId])
+  }, [ensureTimeline, threadId])
 
   const handleNewThread = useCallback(() => {
     setActiveThread(null)
@@ -94,9 +101,9 @@ export function useWorkspaceController() {
     updateStreamError
   })
 
-  const streamStatus = threadStreamState.status
-  const streamUsage = threadStreamState.usage
-  const stateError = threadStreamState.error ?? null
+  const streamStatus = activeThreadStreamState.status
+  const streamUsage = activeThreadStreamState.usage
+  const stateError = activeThreadStreamState.error ?? null
   const manualThreadError = threadId ? getErrorForThread(threadId) : null
   const globalError = getErrorForThread()
   const activeStreamError = manualThreadError ?? stateError ?? globalError ?? null
