@@ -6,6 +6,10 @@ export function CancelAgentStream(arg1) {
   return window['go']['main']['App']['CancelAgentStream'](arg1);
 }
 
+export function CreatePullRequest(arg1) {
+  return window['go']['main']['App']['CreatePullRequest'](arg1);
+}
+
 export function DeleteAttachment(arg1) {
   return window['go']['main']['App']['DeleteAttachment'](arg1);
 }

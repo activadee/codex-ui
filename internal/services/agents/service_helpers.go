@@ -107,17 +107,18 @@ func deriveUserMessageText(req MessageRequest) string {
 }
 
 func toThreadDTO(record discovery.Thread) ThreadDTO {
-    dto := ThreadDTO{
-        ID:             record.ID,
-        ProjectID:      record.ProjectID,
-        ExternalID:     record.ExternalID,
-        WorktreePath:   record.WorktreePath,
-        BranchName:     record.BranchName,
-        Title:          record.Title,
-        Model:          record.Model,
-        SandboxMode:    record.SandboxMode,
-        ReasoningLevel: record.ReasoningLevel,
-        Status:         string(record.Status),
+	dto := ThreadDTO{
+		ID:             record.ID,
+		ProjectID:      record.ProjectID,
+		ExternalID:     record.ExternalID,
+		WorktreePath:   record.WorktreePath,
+		BranchName:     record.BranchName,
+		PRURL:          record.PRURL,
+		Title:          record.Title,
+		Model:          record.Model,
+		SandboxMode:    record.SandboxMode,
+		ReasoningLevel: record.ReasoningLevel,
+		Status:         string(record.Status),
 		CreatedAt:      record.CreatedAt.Format(time.RFC3339),
 		UpdatedAt:      record.UpdatedAt.Format(time.RFC3339),
 	}

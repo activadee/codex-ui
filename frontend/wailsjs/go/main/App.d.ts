@@ -6,6 +6,8 @@ import {main} from '../models';
 
 export function CancelAgentStream(arg1:string):Promise<agents.CancelResponse>;
 
+export function CreatePullRequest(arg1:number):Promise<string>;
+
 export function DeleteAttachment(arg1:string):Promise<void>;
 
 export function DeleteProject(arg1:number):Promise<void>;
