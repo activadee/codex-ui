@@ -42,19 +42,16 @@ export function ThreadListItemRow({ thread, isActive, onSelect, onRename, onDele
   }, [thread.lastActivityAt, thread.relativeTimestamp, thread.timestamp])
 
   const metadataLine = useMemo(() => {
-    const pieces: string[] = []
+    const items: string[] = []
     const branchLabel = formatBranchLabel(thread.branch)
     if (branchLabel) {
-      pieces.push(branchLabel)
+      items.push(branchLabel)
     }
     if (typeof thread.pullRequestNumber === "number") {
-      pieces.push(`PR #${thread.pullRequestNumber}`)
+      items.push(`PR #${thread.pullRequestNumber}`)
     }
-    if (thread.meta) {
-      pieces.push(thread.meta)
-    }
-    return pieces.join(" • ")
-  }, [thread.branch, thread.meta, thread.pullRequestNumber])
+    return items.join(" • ")
+  }, [thread.branch, thread.pullRequestNumber])
 
   const previewLine = useMemo(() => {
     const trimmedPreview = thread.preview?.trim()
@@ -66,10 +63,6 @@ export function ThreadListItemRow({ thread, isActive, onSelect, onRename, onDele
     }
     return trimmedPreview
   }, [thread.preview, thread.title])
-
-  const hasDiffStat = Boolean(
-    thread.diffStat && (thread.diffStat.added > 0 || thread.diffStat.removed > 0)
-  )
 
   const handleRenameSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault()
@@ -112,31 +105,16 @@ export function ThreadListItemRow({ thread, isActive, onSelect, onRename, onDele
           <button
             onClick={() => onSelect(thread)}
             className={cn(
-              "group grid w-full grid-cols-[auto_minmax(0,1fr)_auto] items-start gap-x-3 overflow-hidden rounded-lg border px-3 py-2.5 text-left transition",
+              "group grid w-full grid-cols-[minmax(0,1fr)_auto] gap-x-2 gap-y-1 overflow-hidden rounded-lg border px-2.5 py-2 text-left transition",
               isActive
                 ? "border-primary/60 bg-primary/10 shadow-sm"
-                : "border-border/60 bg-card hover:bg-muted/70"
+                : "border-border/60 bg-card hover:bg-muted/60"
             )}
           >
-            <div className="flex h-full items-start pt-[2px]">
-              <StatusPill status={thread.status} statusLabel={thread.statusLabel} />
-            </div>
-            <div className="min-w-0 space-y-1">
-              <div className="flex min-w-0 items-center gap-2">
-                <span className="truncate text-sm font-semibold text-foreground">{thread.title}</span>
-              </div>
-              {metadataLine && (
-                <div className="text-[11px] font-medium text-muted-foreground">
-                  <span className="line-clamp-1">{metadataLine}</span>
-                </div>
-              )}
-              {previewLine && (
-                <p className="text-xs text-muted-foreground/80">
-                  <span className="line-clamp-1">{previewLine}</span>
-                </p>
-              )}
-            </div>
-            <div className="flex min-w-[52px] flex-col items-end gap-1 text-right">
+            <span className="col-start-1 col-end-2 truncate text-[13px] font-medium leading-tight text-foreground">
+              {thread.title}
+            </span>
+            <div className="col-start-2 row-start-1 flex min-w-[44px] flex-col items-end text-right">
               {timeLabel && (
                 <span
                   className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground"
@@ -145,21 +123,27 @@ export function ThreadListItemRow({ thread, isActive, onSelect, onRename, onDele
                   {timeLabel}
                 </span>
               )}
-              {hasDiffStat && thread.diffStat && (
-                <div className="flex items-center gap-1 text-[10px] font-semibold">
-                  {thread.diffStat.added > 0 && (
-                    <span className="rounded-full bg-emerald-500/10 px-1.5 py-0.5 text-emerald-600">
-                      +{thread.diffStat.added}
-                    </span>
-                  )}
-                  {thread.diffStat.removed > 0 && (
-                    <span className="rounded-full bg-rose-500/10 px-1.5 py-0.5 text-rose-600">
-                      -{thread.diffStat.removed}
-                    </span>
-                  )}
-                </div>
-              )}
             </div>
+            {(metadataLine || hasDiffStat(thread.diffStat)) && (
+              <div className="col-span-2 flex flex-wrap items-center justify-between gap-2 text-[10px] font-medium leading-snug text-muted-foreground">
+                {metadataLine && <span className="flex-1 break-words">{metadataLine}</span>}
+                {hasDiffStat(thread.diffStat) && thread.diffStat && (
+                  <div className="flex items-center gap-1 text-[9px] font-semibold">
+                    {thread.diffStat.added > 0 && (
+                      <span className="text-emerald-600">+{thread.diffStat.added}</span>
+                    )}
+                    {thread.diffStat.removed > 0 && (
+                      <span className="text-rose-600">-{thread.diffStat.removed}</span>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+            {previewLine && (
+              <div className="col-span-2 text-[11px] leading-snug text-muted-foreground/80 break-words">
+                {previewLine}
+              </div>
+            )}
           </button>
         </ContextMenuTrigger>
         <ContextMenuContent className="w-44">
@@ -229,31 +213,6 @@ export function ThreadListItemRow({ thread, isActive, onSelect, onRename, onDele
   )
 }
 
-function StatusPill({
-  status,
-  statusLabel
-}: {
-  status: ThreadListItem["status"]
-  statusLabel: ThreadListItem["statusLabel"]
-}) {
-  const colorMap: Record<ThreadListItem["status"], string> = {
-    active: "bg-emerald-400",
-    completed: "bg-sky-400",
-    stopped: "bg-amber-400",
-    failed: "bg-rose-400"
-  }
-  return (
-    <span
-      className={cn(
-        "h-2.5 w-2.5 shrink-0 rounded-full border border-background",
-        colorMap[status] ?? "bg-muted-foreground"
-      )}
-      aria-hidden
-      title={statusLabel}
-    />
-  )
-}
-
 function formatShortRelativeTime(value?: string) {
   if (!value) {
     return ""
@@ -303,4 +262,8 @@ function formatBranchLabel(branch?: string | null) {
     return ""
   }
   return branch.replace(/^refs\/heads\//, "")
+}
+
+function hasDiffStat(stat?: ThreadListItem["diffStat"]) {
+  return Boolean(stat && (stat.added > 0 || stat.removed > 0))
 }
