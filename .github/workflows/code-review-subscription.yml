@@ -54,6 +54,8 @@ jobs:
           prompt-file: codex_prompt.md
           output-file: codex-output.json
           output-schema: ${{ env.CODEX_OUTPUT_SCHEMA }}
+          model: gpt-5
+          codex-args: -c model_reasoning_effort="high"
 
       - name: Normalize Codex review output
         run: node .github/scripts/codex/normalize-review.cjs
