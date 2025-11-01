@@ -198,10 +198,13 @@ func (s *Service) Send(ctx context.Context, req MessageRequest) (*Stream, discov
 		if perr != nil {
 			return nil, discovery.Thread{}, perr
 		}
-		wtPath, workingDir, _, werr := s.worktrees.EnsureForThread(ctx, project.Path, thread.ID)
-		if werr != nil {
-			return nil, discovery.Thread{}, werr
-		}
+    // Build descriptive naming for worktree dir + branch
+    nameHint := thread.Title
+    branchName := thread.BranchName
+    wtPath, workingDir, _, werr := s.worktrees.EnsureForThread(ctx, project.Path, thread.ID, nameHint, branchName)
+    if werr != nil {
+        return nil, discovery.Thread{}, werr
+    }
 		_ = s.repo.UpdateThreadWorktreePath(ctx, thread.ID, wtPath)
 		thread.WorktreePath = wtPath
 		req.ThreadOptions.WorkingDirectory = workingDir

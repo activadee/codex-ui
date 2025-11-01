@@ -20,16 +20,17 @@ const (
 
 // Thread represents a persisted conversation thread.
 type Thread struct {
-	ID               int64        `json:"id"`
-	ProjectID        int64        `json:"projectId"`
-	ExternalID       string       `json:"externalId,omitempty"`
-	ConversationPath string       `json:"conversationPath,omitempty"`
-	WorktreePath     string       `json:"worktreePath,omitempty"`
-	Title            string       `json:"title"`
-	Model            string       `json:"model"`
-	SandboxMode      string       `json:"sandboxMode"`
-	ReasoningLevel   string       `json:"reasoningLevel"`
-	Status           ThreadStatus `json:"status"`
+    ID               int64        `json:"id"`
+    ProjectID        int64        `json:"projectId"`
+    ExternalID       string       `json:"externalId,omitempty"`
+    ConversationPath string       `json:"conversationPath,omitempty"`
+    WorktreePath     string       `json:"worktreePath,omitempty"`
+    BranchName       string       `json:"branchName,omitempty"`
+    Title            string       `json:"title"`
+    Model            string       `json:"model"`
+    SandboxMode      string       `json:"sandboxMode"`
+    ReasoningLevel   string       `json:"reasoningLevel"`
+    Status           ThreadStatus `json:"status"`
 	CreatedAt        time.Time    `json:"createdAt"`
 	UpdatedAt        time.Time    `json:"updatedAt"`
 	LastMessageAt    *time.Time   `json:"lastMessageAt,omitempty"`
@@ -73,35 +74,39 @@ func (r *Repository) CreateThread(ctx context.Context, params CreateThreadParams
 
 // GetThread retrieves a thread by identifier.
 func (r *Repository) GetThread(ctx context.Context, id int64) (Thread, error) {
-	var (
-		t               Thread
-		externalID      sql.NullString
-		conversationRaw sql.NullString
-		worktreePath    sql.NullString
-		lastMessageAt   sql.NullTime
-	)
-	err := r.db.QueryRowContext(ctx, `
-            SELECT id, project_id, external_id, conversation_path, worktree_path, title, model, sandbox_mode, reasoning_level, status, created_at, updated_at, last_message_at
+    var (
+        t               Thread
+        externalID      sql.NullString
+        conversationRaw sql.NullString
+        worktreePath    sql.NullString
+        branchName      sql.NullString
+        lastMessageAt   sql.NullTime
+    )
+    err := r.db.QueryRowContext(ctx, `
+            SELECT id, project_id, external_id, conversation_path, worktree_path, branch_name, title, model, sandbox_mode, reasoning_level, status, created_at, updated_at, last_message_at
             FROM threads
             WHERE id = ?
-        `, id).Scan(&t.ID, &t.ProjectID, &externalID, &conversationRaw, &worktreePath, &t.Title, &t.Model, &t.SandboxMode, &t.ReasoningLevel, &t.Status, &t.CreatedAt, &t.UpdatedAt, &lastMessageAt)
-	if err != nil {
-		return Thread{}, fmt.Errorf("select thread: %w", err)
-	}
+        `, id).Scan(&t.ID, &t.ProjectID, &externalID, &conversationRaw, &worktreePath, &branchName, &t.Title, &t.Model, &t.SandboxMode, &t.ReasoningLevel, &t.Status, &t.CreatedAt, &t.UpdatedAt, &lastMessageAt)
+    if err != nil {
+        return Thread{}, fmt.Errorf("select thread: %w", err)
+    }
 
-	if externalID.Valid {
-		t.ExternalID = externalID.String
-	}
-	if conversationRaw.Valid {
-		t.ConversationPath = conversationRaw.String
-	}
-	if worktreePath.Valid {
-		t.WorktreePath = worktreePath.String
-	}
-	if lastMessageAt.Valid {
-		t.LastMessageAt = &lastMessageAt.Time
-	}
-	return t, nil
+    if externalID.Valid {
+        t.ExternalID = externalID.String
+    }
+    if conversationRaw.Valid {
+        t.ConversationPath = conversationRaw.String
+    }
+    if worktreePath.Valid {
+        t.WorktreePath = worktreePath.String
+    }
+    if branchName.Valid {
+        t.BranchName = branchName.String
+    }
+    if lastMessageAt.Valid {
+        t.LastMessageAt = &lastMessageAt.Time
+    }
+    return t, nil
 }
 
 // ListThreadsByProject lists threads ordered by recency.
@@ -110,8 +115,8 @@ func (r *Repository) ListThreadsByProject(ctx context.Context, projectID int64) 
 		rows *sql.Rows
 		err  error
 	)
-	rows, err = r.db.QueryContext(ctx, `
-            SELECT id, project_id, external_id, conversation_path, worktree_path, title, model, sandbox_mode, reasoning_level, status, created_at, updated_at, last_message_at
+    rows, err = r.db.QueryContext(ctx, `
+            SELECT id, project_id, external_id, conversation_path, worktree_path, branch_name, title, model, sandbox_mode, reasoning_level, status, created_at, updated_at, last_message_at
             FROM threads
             WHERE project_id = ?
             ORDER BY COALESCE(last_message_at, updated_at) DESC, id DESC
@@ -123,32 +128,36 @@ func (r *Repository) ListThreadsByProject(ctx context.Context, projectID int64) 
 
 	var threads []Thread
 	for rows.Next() {
-		var (
-			t               Thread
-			externalID      sql.NullString
-			conversationRaw sql.NullString
-			worktreePath    sql.NullString
-			lastMessageAt   sql.NullTime
-		)
-		scanErr := rows.Scan(&t.ID, &t.ProjectID, &externalID, &conversationRaw, &worktreePath, &t.Title, &t.Model, &t.SandboxMode, &t.ReasoningLevel, &t.Status, &t.CreatedAt, &t.UpdatedAt, &lastMessageAt)
-		if scanErr != nil {
-			fmt.Println("Scan error:", scanErr)
-			return nil, fmt.Errorf("scan thread: %w", scanErr)
-		}
-		if externalID.Valid {
-			t.ExternalID = externalID.String
-		}
-		if conversationRaw.Valid {
-			t.ConversationPath = conversationRaw.String
-		}
-		if worktreePath.Valid {
-			t.WorktreePath = worktreePath.String
-		}
-		if lastMessageAt.Valid {
-			t.LastMessageAt = &lastMessageAt.Time
-		}
-		threads = append(threads, t)
-	}
+        var (
+            t               Thread
+            externalID      sql.NullString
+            conversationRaw sql.NullString
+            worktreePath    sql.NullString
+            branchName      sql.NullString
+            lastMessageAt   sql.NullTime
+        )
+        scanErr := rows.Scan(&t.ID, &t.ProjectID, &externalID, &conversationRaw, &worktreePath, &branchName, &t.Title, &t.Model, &t.SandboxMode, &t.ReasoningLevel, &t.Status, &t.CreatedAt, &t.UpdatedAt, &lastMessageAt)
+        if scanErr != nil {
+            fmt.Println("Scan error:", scanErr)
+            return nil, fmt.Errorf("scan thread: %w", scanErr)
+        }
+        if externalID.Valid {
+            t.ExternalID = externalID.String
+        }
+        if conversationRaw.Valid {
+            t.ConversationPath = conversationRaw.String
+        }
+        if worktreePath.Valid {
+            t.WorktreePath = worktreePath.String
+        }
+        if branchName.Valid {
+            t.BranchName = branchName.String
+        }
+        if lastMessageAt.Valid {
+            t.LastMessageAt = &lastMessageAt.Time
+        }
+        threads = append(threads, t)
+    }
 	if err := rows.Err(); err != nil {
 		return nil, fmt.Errorf("iterate threads: %w", err)
 	}
@@ -224,15 +233,28 @@ func (r *Repository) UpdateThreadConversationPath(ctx context.Context, id int64,
 
 // UpdateThreadWorktreePath stores the local worktree path for a thread.
 func (r *Repository) UpdateThreadWorktreePath(ctx context.Context, id int64, path string) error {
-	_, err := r.db.ExecContext(ctx, `
+    _, err := r.db.ExecContext(ctx, `
         UPDATE threads
         SET worktree_path = ?, updated_at = CURRENT_TIMESTAMP
         WHERE id = ?
     `, nullIfEmpty(path), id)
-	if err != nil {
-		return fmt.Errorf("update thread worktree path: %w", err)
-	}
-	return nil
+    if err != nil {
+        return fmt.Errorf("update thread worktree path: %w", err)
+    }
+    return nil
+}
+
+// UpdateThreadBranchName stores the git branch name for a thread.
+func (r *Repository) UpdateThreadBranchName(ctx context.Context, id int64, branch string) error {
+    _, err := r.db.ExecContext(ctx, `
+        UPDATE threads
+        SET branch_name = ?, updated_at = CURRENT_TIMESTAMP
+        WHERE id = ?
+    `, nullIfEmpty(branch), id)
+    if err != nil {
+        return fmt.Errorf("update thread branch name: %w", err)
+    }
+    return nil
 }
 
 // DeleteThread removes a thread and cascades entries via foreign key constraints.
