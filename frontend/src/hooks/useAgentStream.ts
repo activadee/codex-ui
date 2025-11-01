@@ -126,10 +126,20 @@ export function useAgentStream(options: UseAgentStreamOptions = {}) {
 
   const cancelStream = useCallback(
     async (threadId?: number) => {
-      if (!threadId) {
+      let targetThreadId = threadId
+      if (targetThreadId === undefined) {
+        const activeThreads = Object.entries(threadStatesRef.current).filter(
+          ([, state]) => state.status === "streaming"
+        )
+        if (activeThreads.length !== 1) {
+          return
+        }
+        targetThreadId = Number(activeThreads[0][0])
+      }
+      if (targetThreadId === undefined) {
         return
       }
-      const current = threadStatesRef.current[threadId]
+      const current = threadStatesRef.current[targetThreadId]
       if (!current?.streamId) {
         return
       }
@@ -138,7 +148,7 @@ export function useAgentStream(options: UseAgentStreamOptions = {}) {
         const response = await CancelAgentStream(streamId)
         cleanupListener(streamId)
         streamThreadMap.current.delete(streamId)
-        updateThreadState(threadId, (prev) => ({
+        updateThreadState(targetThreadId, (prev) => ({
           ...prev,
           status: "stopped",
           streamId: undefined
@@ -146,13 +156,13 @@ export function useAgentStream(options: UseAgentStreamOptions = {}) {
         optionsRef.current.onComplete?.(response.threadId, response.status, streamId)
       } catch (err) {
         const message = err instanceof Error ? err.message : "Failed to cancel stream"
-        updateThreadState(threadId, (prev) => ({
+        updateThreadState(targetThreadId, (prev) => ({
           ...prev,
           status: "error",
           error: message,
           streamId: undefined
         }))
-        optionsRef.current.onError?.(message, { threadId, streamId })
+        optionsRef.current.onError?.(message, { threadId: targetThreadId, streamId })
       }
     },
     [cleanupListener, updateThreadState]
