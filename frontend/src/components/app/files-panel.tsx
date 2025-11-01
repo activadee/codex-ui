@@ -7,7 +7,7 @@ import { cn } from "@/lib/utils"
 import { useThreadFileDiffs } from "@/hooks/useThreadFileDiffs"
 import { BrowserOpenURL } from "../../../wailsjs/runtime/runtime"
 import { CreatePullRequest, GetThread } from "../../../wailsjs/go/main/App"
-import type { AgentThread } from "@/types/app"
+import { agents } from "../../../wailsjs/go/models"
 
 type FilesPanelProps = {
   threadId?: number
@@ -33,9 +33,9 @@ export function FilesPanel({ threadId }: FilesPanelProps) {
         return
       }
       try {
-        const t: AgentThread = (await GetThread(threadId)) as unknown as AgentThread
+        const dto: agents.ThreadDTO = await GetThread(threadId)
         if (!active) return
-        setPrUrl(t?.prUrl ?? undefined)
+        setPrUrl(dto?.prUrl ?? undefined)
       } catch (e) {
         if (!active) return
         // Non-fatal for showing buttons

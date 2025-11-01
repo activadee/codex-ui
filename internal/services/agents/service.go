@@ -455,13 +455,16 @@ func (s *Service) ListThreadDiffStats(ctx context.Context, threadID int64) ([]Fi
 }
 
 func (s *Service) computeDiffSummary(ctx context.Context, worktreePath string) *DiffSummaryDTO {
-	if strings.TrimSpace(worktreePath) == "" {
-		return nil
-	}
-	stats, err := collectGitDiffStats(ctx, worktreePath)
-	if err != nil {
-		return nil
-	}
+    if strings.TrimSpace(worktreePath) == "" {
+        return nil
+    }
+    // Guard against slow git calls blocking list/get requests
+    tctx, cancel := context.WithTimeout(ctx, 250*time.Millisecond)
+    defer cancel()
+    stats, err := collectGitDiffStats(tctx, worktreePath)
+    if err != nil {
+        return nil
+    }
 	var added, removed int
 	for _, stat := range stats {
 		added += stat.Added
