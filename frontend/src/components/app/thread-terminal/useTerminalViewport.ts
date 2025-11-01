@@ -37,8 +37,7 @@ export function useTerminalViewport({ threadId, subscribe, resize, send }: Termi
   const resizeFrameRef = useRef<number | null>(null)
   const sendRef = useRef(send)
 
-  const scheduleFit = useCallback(
-    (flush = false) => {
+  const scheduleFit = useCallback(() => {
       if (!terminalRef.current || !fitAddonRef.current) {
         return
       }
@@ -60,15 +59,6 @@ export function useTerminalViewport({ threadId, subscribe, resize, send }: Termi
           lastSizeRef.current = { cols, rows }
           void resize(cols, rows)
         }
-      }
-
-      if (flush) {
-        if (resizeFrameRef.current !== null) {
-          cancelAnimationFrame(resizeFrameRef.current)
-          resizeFrameRef.current = null
-        }
-        runFit()
-        return
       }
 
       if (resizeFrameRef.current !== null) {
@@ -110,7 +100,7 @@ export function useTerminalViewport({ threadId, subscribe, resize, send }: Termi
     lastSizeRef.current = null
 
     terminal.open(containerRef.current)
-    scheduleFit(true)
+    scheduleFit()
 
     const disposeOutput = subscribe((event) => {
       if (!terminalRef.current) {

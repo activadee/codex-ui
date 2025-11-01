@@ -1,5 +1,3 @@
-import { useMemo } from "react"
-
 import { ConversationPane } from "@/components/app/conversation-pane"
 import { ComposerPanel } from "@/components/app/composer-panel"
 import { WorkspaceAlerts } from "@/components/app/workspace-alerts"
@@ -7,6 +5,7 @@ import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/componen
 import { FilesPanel } from "@/components/app/files-panel"
 import { ThreadTerminal } from "@/components/app/thread-terminal"
 import { useWorkspaceRouteContext } from "@/routes/workspace-context"
+import type { ConversationEntry } from "@/types/app"
 
 export default function ThreadRoute() {
   const {
@@ -38,33 +37,21 @@ export default function ThreadRoute() {
     )
   }
 
-  const alerts = useMemo(() => {
-    const items: { id: string; message: string; tone?: "info" | "error" }[] = []
-    if (projects.isLoading || threads.isLoading) {
-      items.push({ id: "loading", message: "Loading workspace…", tone: "info" })
-    }
-    if (projects.error) {
-      items.push({ id: "projects-error", message: projects.error, tone: "error" })
-    }
-    if (threads.error) {
-      items.push({ id: "threads-error", message: threads.error, tone: "error" })
-    }
-    return items
-  }, [projects.error, projects.isLoading, threads.error, threads.isLoading])
+  const alerts: { id: string; message: string; tone?: "info" | "error" }[] = []
+  if (projects.isLoading || threads.isLoading) {
+    alerts.push({ id: "loading", message: "Loading workspace…", tone: "info" })
+  }
+  if (projects.error) {
+    alerts.push({ id: "projects-error", message: projects.error, tone: "error" })
+  }
+  if (threads.error) {
+    alerts.push({ id: "threads-error", message: threads.error, tone: "error" })
+  }
 
   const hasDraftContent = prompt.trim().length > 0 || imageAttachments.length > 0
   const canSend = Boolean(hasDraftContent && projects.active && !stream.isStreaming)
 
-  const latestTodoList = useMemo(() => {
-    for (let index = conversation.list.length - 1; index >= 0; index -= 1) {
-      const entry = conversation.list[index]
-      if (entry.role === "agent" && entry.item?.type === "todo_list") {
-        const items = entry.item.todoList?.items ?? []
-        return { items }
-      }
-    }
-    return null
-  }, [conversation.list])
+  const latestTodoList = getLatestTodoList(conversation.list)
 
   return (
     <div className="flex h-full min-h-0 w-full flex-col">
@@ -84,7 +71,7 @@ export default function ThreadRoute() {
                 isStreaming={stream.isStreaming}
                 streamStatus={stream.status}
               />
-              <div className="border-t border-border/70 bg-white px-4 py-4">
+              <div className="border-t border-border/70 bg-white">
                 <ComposerPanel
                   projectName={projects.active.name}
                   prompt={prompt}
@@ -135,4 +122,15 @@ export default function ThreadRoute() {
       </div>
     </div>
   )
+}
+
+function getLatestTodoList(conversationEntries: ConversationEntry[]) {
+  for (let index = conversationEntries.length - 1; index >= 0; index -= 1) {
+    const entry = conversationEntries[index]
+    if (entry.role === "agent" && entry.item?.type === "todo_list") {
+      const items = entry.item.todoList?.items ?? []
+      return { items }
+    }
+  }
+  return null
 }

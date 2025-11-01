@@ -73,7 +73,7 @@ export default function NewThreadRoute() {
             isStreaming={workspace.stream.isStreaming}
             streamStatus={workspace.stream.status}
           />
-          <div className="border-t border-border/70 bg-white px-4 py-4">
+          <div className="border-t border-border/70 bg-white">
             <ComposerPanel
               projectName={workspace.projects.active?.name ?? "Workspace"}
               prompt={prompt}
