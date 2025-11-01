@@ -624,7 +624,7 @@ export function useWorkspaceController() {
       list: conversation
     },
     stream: {
-      isStreaming: isThreadStreaming,
+      isStreaming: isThreadStreaming || getThreadState(undefined).status === "streaming",
       status: streamStatus,
       usage: streamUsage,
       error: activeStreamError,
