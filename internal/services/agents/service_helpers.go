@@ -1,12 +1,13 @@
 package agents
 
 import (
-	"context"
-	"errors"
-	"strings"
-	"time"
+    "context"
+    "errors"
+    "strings"
+    "time"
 
-	"codex-ui/internal/storage/discovery"
+    "codex-ui/internal/storage/discovery"
+    "codex-ui/internal/worktrees"
 )
 
 var errRepositoryUnavailable = errors.New("agent repository not initialised")
@@ -44,13 +45,21 @@ func (s *Service) prepareThread(ctx context.Context, req *MessageRequest) (disco
 		SandboxMode:    req.ThreadOptions.SandboxMode,
 		ReasoningLevel: req.ThreadOptions.ReasoningLevel,
 	}
-	thread, err := s.repo.CreateThread(ctx, params)
-	if err != nil {
-		return discovery.Thread{}, err
-	}
-	req.ThreadID = thread.ID
-	req.ThreadExternalID = thread.ExternalID
-	return thread, nil
+    thread, err := s.repo.CreateThread(ctx, params)
+    if err != nil {
+        return discovery.Thread{}, err
+    }
+    // Persist a stable, descriptive branch name for this thread
+    if err := s.repo.UpdateThreadBranchName(ctx, thread.ID, worktrees.BranchName(title, thread.ID)); err == nil {
+        // Best-effort set on returned object; non-fatal if it fails later
+        updated, _ := s.repo.GetThread(ctx, thread.ID)
+        if updated.ID == thread.ID {
+            thread = updated
+        }
+    }
+    req.ThreadID = thread.ID
+    req.ThreadExternalID = thread.ExternalID
+    return thread, nil
 }
 
 func deriveTitle(input string, segments []InputSegmentDTO) string {
@@ -98,16 +107,17 @@ func deriveUserMessageText(req MessageRequest) string {
 }
 
 func toThreadDTO(record discovery.Thread) ThreadDTO {
-	dto := ThreadDTO{
-		ID:             record.ID,
-		ProjectID:      record.ProjectID,
-		ExternalID:     record.ExternalID,
-		WorktreePath:   record.WorktreePath,
-		Title:          record.Title,
-		Model:          record.Model,
-		SandboxMode:    record.SandboxMode,
-		ReasoningLevel: record.ReasoningLevel,
-		Status:         string(record.Status),
+    dto := ThreadDTO{
+        ID:             record.ID,
+        ProjectID:      record.ProjectID,
+        ExternalID:     record.ExternalID,
+        WorktreePath:   record.WorktreePath,
+        BranchName:     record.BranchName,
+        Title:          record.Title,
+        Model:          record.Model,
+        SandboxMode:    record.SandboxMode,
+        ReasoningLevel: record.ReasoningLevel,
+        Status:         string(record.Status),
 		CreatedAt:      record.CreatedAt.Format(time.RFC3339),
 		UpdatedAt:      record.UpdatedAt.Format(time.RFC3339),
 	}

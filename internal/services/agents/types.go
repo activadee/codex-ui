@@ -148,15 +148,16 @@ type ConversationEntryDTO struct {
 
 // ThreadDTO mirrors persisted thread data for the frontend.
 type ThreadDTO struct {
-	ID             int64   `json:"id"`
-	ProjectID      int64   `json:"projectId"`
-	ExternalID     string  `json:"externalId,omitempty"`
-	WorktreePath   string  `json:"worktreePath,omitempty"`
-	Title          string  `json:"title"`
-	Model          string  `json:"model"`
-	SandboxMode    string  `json:"sandboxMode"`
-	ReasoningLevel string  `json:"reasoningLevel"`
-	Status         string  `json:"status"`
+    ID             int64   `json:"id"`
+    ProjectID      int64   `json:"projectId"`
+    ExternalID     string  `json:"externalId,omitempty"`
+    WorktreePath   string  `json:"worktreePath,omitempty"`
+    BranchName     string  `json:"branchName,omitempty"`
+    Title          string  `json:"title"`
+    Model          string  `json:"model"`
+    SandboxMode    string  `json:"sandboxMode"`
+    ReasoningLevel string  `json:"reasoningLevel"`
+    Status         string  `json:"status"`
 	CreatedAt      string  `json:"createdAt"`
 	UpdatedAt      string  `json:"updatedAt"`
 	LastMessageAt  *string `json:"lastMessageAt,omitempty"`
