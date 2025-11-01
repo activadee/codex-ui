@@ -23,7 +23,6 @@ export type StreamLifecycleOptions = {
   upsertAgentEntry: (threadId: number, item: AgentItemPayload) => void
   ensureTimeline: (threadId: number) => void
   appendUserEntry: (threadId: number, entry: UserConversationEntry) => void
-  loadConversation: (threadId: number) => Promise<any>
   refreshThread: (threadId: number) => Promise<any>
   setActiveThread: (thread: ThreadListItem | null) => void
   syncThreadPreviewFromConversation: (threadId: number) => void
@@ -38,7 +37,6 @@ export function useStreamLifecycle(options: StreamLifecycleOptions) {
     upsertAgentEntry,
     ensureTimeline,
     appendUserEntry,
-    loadConversation,
     refreshThread,
     setActiveThread,
     syncThreadPreviewFromConversation,
@@ -110,7 +108,7 @@ export function useStreamLifecycle(options: StreamLifecycleOptions) {
       const listItem = threadToListItem(record)
       setActiveThread(listItem)
 
-      await loadConversation(threadIdFromStream)
+      syncThreadPreviewFromConversation(threadIdFromStream)
 
       if (statusMessage && statusMessage.trim()) {
         appendSystemEntry(threadIdFromStream, {

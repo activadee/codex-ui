@@ -120,19 +120,7 @@ export function useAgentStream(options: UseAgentStreamOptions = {}) {
         return
       }
       const current = threadStatesRef.current[targetThreadId]
-      let streamId = current?.streamId
-      if (!streamId) {
-        const fallbackEntry = Object.entries(threadStatesRef.current).find(([, state]) => state.streamId)
-        if (!fallbackEntry) {
-          return
-        }
-        const [fallbackThreadId, state] = fallbackEntry
-        if (!state.streamId) {
-          return
-        }
-        streamId = state.streamId
-        targetThreadId = Number(fallbackThreadId)
-      }
+      const streamId = current?.streamId
       if (!streamId) {
         return
       }
