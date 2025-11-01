@@ -363,6 +363,7 @@ export namespace agents {
 	    projectId: number;
 	    externalId?: string;
 	    worktreePath?: string;
+	    prUrl?: string;
 	    title: string;
 	    model: string;
 	    sandboxMode: string;
@@ -382,6 +383,7 @@ export namespace agents {
 	        this.projectId = source["projectId"];
 	        this.externalId = source["externalId"];
 	        this.worktreePath = source["worktreePath"];
+	        this.prUrl = source["prUrl"];
 	        this.title = source["title"];
 	        this.model = source["model"];
 	        this.sandboxMode = source["sandboxMode"];
