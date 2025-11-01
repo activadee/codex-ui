@@ -162,9 +162,7 @@ export function useAgentStream(options: UseAgentStreamOptions = {}) {
         const message = err instanceof Error ? err.message : "Failed to cancel stream"
         updateThreadState(targetThreadId, (prev) => ({
           ...prev,
-          status: "error",
-          error: message,
-          streamId: undefined
+          error: message
         }))
         optionsRef.current.onError?.(message, { threadId: targetThreadId, streamId })
       }
