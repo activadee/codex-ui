@@ -1,14 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react"
 
 import { ListThreadFileDiffs } from "../../wailsjs/go/main/App"
-import { EventsOn } from "../../wailsjs/runtime/runtime"
-import { fileChangeTopic } from "@/lib/threads"
+import { useThreadEventRouter, type FileDiffEvent } from "@/lib/thread-events"
 import type { FileDiffStat } from "@/types/app"
-
-type FileDiffEvent = {
-  threadId: number
-  files: FileDiffStat[]
-}
 
 type UseThreadFileDiffsResponse = {
   files: FileDiffStat[]
@@ -21,10 +15,10 @@ export function useThreadFileDiffs(threadId?: number): UseThreadFileDiffsRespons
   const [files, setFiles] = useState<FileDiffStat[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const listenerRef = useRef<(() => void) | null>(null)
   const activeThreadRef = useRef<number | undefined>(threadId)
+  const router = useThreadEventRouter()
 
- const loadFiles = useCallback(async () => {
+  const loadFiles = useCallback(async () => {
     if (!threadId) {
       setFiles([])
       setError(null)
@@ -61,29 +55,17 @@ export function useThreadFileDiffs(threadId?: number): UseThreadFileDiffsRespons
 
   useEffect(() => {
     if (!threadId) {
-      if (listenerRef.current) {
-        listenerRef.current()
-        listenerRef.current = null
-      }
       return
     }
-    const topic = fileChangeTopic(threadId)
-    const handleEvent = (payload: FileDiffEvent) => {
-      if (!payload || payload.threadId !== threadId) {
-        return
-      }
+    const unsubscribe = router.subscribeToDiffs(threadId, (payload: FileDiffEvent) => {
       setFiles(payload.files ?? [])
       setError(null)
       setIsLoading(false)
-    }
-    listenerRef.current = EventsOn(topic, handleEvent)
+    })
     return () => {
-      if (listenerRef.current) {
-        listenerRef.current()
-        listenerRef.current = null
-      }
+      unsubscribe()
     }
-  }, [threadId])
+  }, [router, threadId])
 
   const refresh = useCallback(async () => {
     await loadFiles()

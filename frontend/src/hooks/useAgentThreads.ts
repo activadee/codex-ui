@@ -1,56 +1,65 @@
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useMemo } from "react"
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 
 import { GetThread, ListThreads } from "../../wailsjs/go/main/App"
 import { mapThreadDtoToThread } from "@/lib/threads"
 import type { AgentThread } from "@/types/app"
 
 export function useAgentThreads(projectId: number | null) {
-  const [threads, setThreads] = useState<AgentThread[]>([])
-  const [isLoading, setIsLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const queryClient = useQueryClient()
 
-  const loadThreads = useCallback(async () => {
-    if (!projectId) {
-      setThreads([])
-      return
-    }
-    setIsLoading(true)
-    try {
+  const threadsQuery = useQuery({
+    queryKey: ["threads", projectId],
+    queryFn: async (): Promise<AgentThread[]> => {
+      if (!projectId) {
+        return []
+      }
       const response = await ListThreads(projectId)
-      setThreads(response.map(mapThreadDtoToThread))
-      setError(null)
-    } catch (err) {
-      const message = err instanceof Error ? err.message : "Failed to load threads"
-      setError(message)
-      setThreads([])
-    } finally {
-      setIsLoading(false)
-    }
-  }, [projectId])
+      return response.map(mapThreadDtoToThread)
+    },
+    enabled: Boolean(projectId),
+    staleTime: 15_000,
+    gcTime: 60_000
+  })
 
-  useEffect(() => {
-    loadThreads()
-  }, [loadThreads])
+  const mutation = useMutation({
+    mutationFn: async (threadId: number) => {
+      const dto = await GetThread(threadId)
+      return mapThreadDtoToThread(dto)
+    },
+    onSuccess: (thread) => {
+      queryClient.setQueryData<AgentThread[]>(["threads", thread.projectId], (prev = []) => {
+        const index = prev.findIndex((item) => item.id === thread.id)
+        if (index >= 0) {
+          const clone = [...prev]
+          clone[index] = thread
+          return clone
+        }
+        return [thread, ...prev]
+      })
+    }
+  })
 
   const refreshThread = useCallback(async (threadId: number) => {
-    const dto = await GetThread(threadId)
-    const mapped = mapThreadDtoToThread(dto)
-    setThreads((prev) => {
-      const exists = prev.some((thread) => thread.id === mapped.id)
-      if (exists) {
-        return prev.map((thread) => (thread.id === mapped.id ? mapped : thread))
-      }
-      return [mapped, ...prev]
-    })
-    return mapped
-  }, [])
+    const thread = await mutation.mutateAsync(threadId)
+    return thread
+  }, [mutation])
+
+  const threads = useMemo(() => {
+    if (!projectId) {
+      return []
+    }
+    return threadsQuery.data ?? []
+  }, [projectId, threadsQuery.data])
 
   return {
     threads,
-    isLoading,
-    error,
-    loadThreads,
+    isLoading: threadsQuery.isPending || threadsQuery.isFetching,
+    error: threadsQuery.error ? (threadsQuery.error instanceof Error ? threadsQuery.error.message : "Failed to load threads") : null,
+    loadThreads: () => threadsQuery.refetch(),
     refreshThread,
-    setThreads
+    setThreads: (updater: (prev: AgentThread[]) => AgentThread[]) => {
+      queryClient.setQueryData<AgentThread[]>(["threads", projectId], (prev = []) => updater(prev))
+    }
   }
 }

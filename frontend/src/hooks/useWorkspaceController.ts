@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { useQueryClient } from "@tanstack/react-query"
 
 import { agents } from "../../wailsjs/go/models"
 import { DeleteAttachment, DeleteThread, LoadThreadConversation, RenameThread } from "../../wailsjs/go/main/App"
@@ -17,6 +18,7 @@ import type {
 import { useProjects } from "@/hooks/useProjects"
 import { useAgentThreads } from "@/hooks/useAgentThreads"
 import { useAgentStream } from "@/hooks/useAgentStream"
+import { useThreadConversation, normaliseConversation } from "@/hooks/useThreadConversation"
 
 type SendMessageOptions = {
   content: string
@@ -26,8 +28,6 @@ type SendMessageOptions = {
   attachmentPaths?: string[]
   segments?: UserMessageSegment[]
 }
-
-type ConversationMap = Record<number, ConversationEntry[]>
 
 type StreamErrorMap = Partial<Record<number, string>> & { global?: string }
 
@@ -68,30 +68,36 @@ export function useWorkspaceController() {
     })
   }, [])
 
-  const [conversationMap, setConversationMap] = useState<ConversationMap>({})
-  const conversationRef = useRef<ConversationMap>({})
-
-  const updateConversationMap = useCallback((updater: (current: ConversationMap) => ConversationMap) => {
-    setConversationMap((prev) => {
-      const next = updater(prev)
-      conversationRef.current = next
-      return next
-    })
-  }, [])
+  const queryClient = useQueryClient()
 
   const ensureTimeline = useCallback(
     (threadId: number) => {
       if (threadId <= 0) {
         return
       }
-      updateConversationMap((prev) => {
-        if (prev[threadId]) {
-          return prev
-        }
-        return { ...prev, [threadId]: [] }
-      })
+      queryClient.setQueryData<ConversationEntry[]>(["conversation", threadId], (prev) => prev ?? [])
     },
-    [updateConversationMap]
+    [queryClient]
+  )
+
+  const getConversationEntries = useCallback(
+    (threadId: number): ConversationEntry[] => {
+      if (threadId <= 0) {
+        return []
+      }
+      return queryClient.getQueryData<ConversationEntry[]>(["conversation", threadId]) ?? []
+    },
+    [queryClient]
+  )
+
+  const updateConversationEntries = useCallback(
+    (threadId: number, updater: (entries: ConversationEntry[]) => ConversationEntry[]) => {
+      if (threadId <= 0) {
+        return
+      }
+      queryClient.setQueryData<ConversationEntry[]>(["conversation", threadId], (prev = []) => updater(prev))
+    },
+    [queryClient]
   )
 
   const projectId = activeProject?.id ?? null
@@ -155,44 +161,8 @@ export function useWorkspaceController() {
       }
       try {
         const response = await LoadThreadConversation(threadId)
-        const normalized: ConversationEntry[] = response.map((entry) => {
-          if (entry.role === "agent") {
-            const cloned = entry.item
-              ? (JSON.parse(JSON.stringify(entry.item)) as AgentItemPayload)
-              : ({ id: entry.id, type: "agent_message", text: "" } as AgentItemPayload)
-            return {
-              id: entry.id,
-              role: "agent" as const,
-              createdAt: entry.createdAt,
-              updatedAt: entry.updatedAt ?? entry.createdAt,
-              item: cloned
-            }
-          }
-          if (entry.role === "user") {
-            const segments: UserMessageSegment[] = (entry.segments ?? []).map((segment) => {
-              if (segment.type === "image") {
-                return { type: "image", imagePath: segment.imagePath ?? "" }
-              }
-              return { type: "text", text: segment.text ?? "" }
-            })
-            return {
-              id: entry.id,
-              role: "user" as const,
-              createdAt: entry.createdAt,
-              text: entry.text ?? "",
-              segments
-            }
-          }
-          return {
-            id: entry.id,
-            role: "system" as const,
-            createdAt: entry.createdAt,
-            tone: (entry.tone as SystemConversationEntry["tone"]) ?? "info",
-            message: entry.message ?? "",
-            meta: entry.meta ?? {}
-          }
-        })
-        updateConversationMap((prev) => ({ ...prev, [threadId]: normalized }))
+        const normalized = normaliseConversation(response)
+        queryClient.setQueryData<ConversationEntry[]>(["conversation", threadId], normalized)
         applyPreviewFromEntries(threadId, normalized)
         return normalized
       } catch (error) {
@@ -200,28 +170,26 @@ export function useWorkspaceController() {
         return [] as ConversationEntry[]
       }
     },
-    [applyPreviewFromEntries, updateConversationMap]
+    [applyPreviewFromEntries, queryClient]
   )
 
   const appendUserEntry = useCallback(
     (threadId: number, entry: UserConversationEntry) => {
-      updateConversationMap((prev) => {
-        const existing = prev[threadId] ?? []
-        return { ...prev, [threadId]: [...existing, entry] }
-      })
+      ensureTimeline(threadId)
+      updateConversationEntries(threadId, (existing) => [...existing, entry])
       if (entry.text.trim()) {
         applyThreadPreview(threadId, entry.text, entry.createdAt)
       }
     },
-    [applyThreadPreview, updateConversationMap]
+    [applyThreadPreview, ensureTimeline, updateConversationEntries]
   )
 
   const upsertAgentEntry = useCallback(
     (threadId: number, item: AgentItemPayload) => {
       const identifier = item.id && item.id.trim() ? item.id : `agent-${Date.now().toString(36)}`
       const timestamp = new Date().toISOString()
-      updateConversationMap((prev) => {
-        const existing = prev[threadId] ?? []
+      ensureTimeline(threadId)
+      updateConversationEntries(threadId, (existing) => {
         const index = existing.findIndex((entry) => entry.role === "agent" && entry.id === identifier)
         if (index >= 0) {
           const current = existing[index] as AgentConversationEntry
@@ -232,7 +200,7 @@ export function useWorkspaceController() {
           }
           const nextList = [...existing]
           nextList[index] = nextEntry
-          return { ...prev, [threadId]: nextList }
+          return nextList
         }
         const nextEntry: AgentConversationEntry = {
           id: identifier,
@@ -241,35 +209,33 @@ export function useWorkspaceController() {
           updatedAt: timestamp,
           item: { ...item, id: identifier }
         }
-        return { ...prev, [threadId]: [...existing, nextEntry] }
+        return [...existing, nextEntry]
       })
 
       if (item.type === "agent_message" && item.text) {
         applyThreadPreview(threadId, item.text, timestamp)
       }
     },
-    [applyThreadPreview, updateConversationMap]
+    [applyThreadPreview, ensureTimeline, updateConversationEntries]
   )
 
   const appendSystemEntry = useCallback(
     (threadId: number, entry: SystemConversationEntry) => {
-      updateConversationMap((prev) => {
-        const existing = prev[threadId] ?? []
-        return { ...prev, [threadId]: [...existing, entry] }
-      })
+      ensureTimeline(threadId)
+      updateConversationEntries(threadId, (existing) => [...existing, entry])
     },
-    [updateConversationMap]
+    [ensureTimeline, updateConversationEntries]
   )
 
   const syncThreadPreviewFromConversation = useCallback(
     (threadId: number) => {
-      const entries = conversationRef.current[threadId]
+      const entries = getConversationEntries(threadId)
       if (!entries || entries.length === 0) {
         return
       }
       applyPreviewFromEntries(threadId, entries)
     },
-    [applyPreviewFromEntries]
+    [applyPreviewFromEntries, getConversationEntries]
   )
 
   const sections = useMemo<ThreadSection[]>(() => formatThreadSections(threads), [threads])
@@ -293,12 +259,7 @@ export function useWorkspaceController() {
   }, [threads])
 
   const threadId = activeThread?.id ?? null
-  const conversation = useMemo(() => {
-    if (!threadId) {
-      return []
-    }
-    return conversationMap[threadId] ?? []
-  }, [conversationMap, threadId])
+  const { entries: conversationEntries } = useThreadConversation(threadId)
 
 
   const { startStream, cancelStream, getThreadState } = useAgentStream({
@@ -416,7 +377,14 @@ export function useWorkspaceController() {
   }, [updateStreamError])
 
   const sendMessage = useCallback(
-    async ({ content, model, sandbox, reasoning, segments, attachmentPaths }: SendMessageOptions) => {
+    async ({
+      content,
+      model,
+      sandbox,
+      reasoning,
+      segments,
+      attachmentPaths
+    }: SendMessageOptions): Promise<number | undefined> => {
       const project = activeProject
       if (!project) {
         throw new Error("No active project selected")
@@ -446,7 +414,7 @@ export function useWorkspaceController() {
 
       const hasSegments = normalizedSegments.length > 0
       if (!trimmed && !hasSegments) {
-        return
+        return undefined
       }
 
       updateStreamError(null, activeThread?.id ?? undefined)
@@ -490,6 +458,7 @@ export function useWorkspaceController() {
       const listItem = threadToListItem(record)
       setActiveThread(listItem)
       syncThreadPreviewFromConversation(handle.threadId)
+      return handle.threadId
     },
     [
       activeProject,
@@ -561,14 +530,7 @@ export function useWorkspaceController() {
       try {
         await DeleteThread(thread.id)
         setThreads((prev) => prev.filter((existing) => existing.id !== thread.id))
-        updateConversationMap((prev) => {
-          if (!prev[thread.id]) {
-            return prev
-          }
-          const next = { ...prev }
-          delete next[thread.id]
-          return next
-        })
+        queryClient.removeQueries({ queryKey: ["conversation", thread.id] })
         setActiveThread((prev) => {
           if (prev?.id === thread.id) {
             return null
@@ -580,7 +542,7 @@ export function useWorkspaceController() {
         throw error
       }
     },
-    [setActiveThread, setThreads, updateConversationMap, updateStreamError]
+    [queryClient, setActiveThread, setThreads, updateStreamError]
   )
 
   const streamStatus = threadStreamState.status
@@ -621,7 +583,7 @@ export function useWorkspaceController() {
       remove: deleteThread
     },
     conversation: {
-      list: conversation
+      list: conversationEntries
     },
     stream: {
       isStreaming: isThreadStreaming || getThreadState(undefined).status === "streaming",

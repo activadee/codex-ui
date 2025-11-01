@@ -1,4 +1,15 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import {
+  Navigate,
+  Outlet,
+  Route,
+  Routes,
+  matchPath,
+  useLocation,
+  useNavigate,
+  useOutletContext,
+  useParams
+} from "react-router-dom"
 
 import { WorkspaceShell } from "@/components/app/workspace-shell"
 import { WorkspaceAlerts } from "@/components/app/workspace-alerts"
@@ -15,11 +26,42 @@ import {
   type SelectOption
 } from "@/data/app-data"
 import { useWorkspaceController } from "@/hooks/useWorkspaceController"
+import { threadToListItem } from "@/lib/threads"
 import type { ImageAttachment, Project, ThreadListItem } from "@/types/app"
 import { DeleteAttachment, SaveClipboardImage, SelectProjectDirectory } from "../wailsjs/go/main/App"
 
-function App() {
-  const { projects, threads, conversation, stream, selection } = useWorkspaceController()
+type WorkspaceRouteContext = {
+  workspace: ReturnType<typeof useWorkspaceController>
+  prompt: string
+  setPrompt: (value: string) => void
+  imageAttachments: ImageAttachment[]
+  onAddImages: (files: File[]) => void
+  onRemoveAttachment: (id: string) => void
+  selectModel: (value: string) => void
+  selectSandbox: (value: string) => void
+  selectReasoning: (value: string) => void
+  model: SelectOption
+  sandbox: SelectOption
+  reasoning: SelectOption
+  reasoningOptions: SelectOption[]
+  modelOptions: SelectOption[]
+  sandboxOptions: SelectOption[]
+  sendPrompt: () => Promise<number | undefined>
+}
+
+function WorkspaceLayout() {
+  const workspace = useWorkspaceController()
+  const navigate = useNavigate()
+  const location = useLocation()
+
+  const projectMatch = matchPath("/projects/:projectId/*", location.pathname)
+  const threadMatch = matchPath("/projects/:projectId/threads/:threadId", location.pathname)
+  const threadIdParamRaw = threadMatch?.params?.threadId ?? null
+  const isNewThreadRoute = threadIdParamRaw === "new"
+  const threadIdParam =
+    threadIdParamRaw && !isNewThreadRoute && !Number.isNaN(Number(threadIdParamRaw))
+      ? Number(threadIdParamRaw)
+      : null
 
   const [prompt, setPrompt] = useState("")
   const [isDialogOpen, setIsDialogOpen] = useState(false)
@@ -32,10 +74,11 @@ function App() {
   const [reasoning, setReasoning] = useState<SelectOption>(reasoningOptions[0])
   const [imageAttachments, setImageAttachments] = useState<ImageAttachment[]>([])
   const attachmentsRef = useRef<ImageAttachment[]>([])
+  const lastThreadIdRef = useRef<number | "new" | null>(null)
 
   useEffect(() => {
-    const available = getReasoningOptions(model.value)
-    setReasoning((prev) => available.find((option) => option.value === prev.value) ?? available[0])
+    const options = getReasoningOptions(model.value)
+    setReasoning((prev) => options.find((option) => option.value === prev.value) ?? options[0])
   }, [model])
 
   const releaseAttachmentUrl = useCallback((attachment: ImageAttachment) => {
@@ -122,7 +165,7 @@ function App() {
         } catch (error) {
           console.error("Failed to save pasted image", error)
           const message = error instanceof Error ? error.message : "Failed to attach image"
-          stream.setError(message)
+          workspace.stream.setError(message)
         }
       }
 
@@ -130,7 +173,7 @@ function App() {
         setImageAttachments((previous) => [...previous, ...newAttachments])
       }
     },
-    [stream]
+    [workspace.stream]
   )
 
   const handleComposerAddImages = useCallback(
@@ -143,9 +186,10 @@ function App() {
   const handleProjectChange = useCallback(
     (project: Project) => {
       clearAttachments()
-      void projects.select(project)
+      void workspace.projects.select(project)
+      navigate(`/projects/${project.id}`)
     },
-    [clearAttachments, projects]
+    [clearAttachments, navigate, workspace.projects]
   )
 
   const handleRegisterProject = useCallback(
@@ -153,7 +197,7 @@ function App() {
       setIsSubmittingProject(true)
       setDialogError(null)
       try {
-        await projects.register(payload.path, payload.displayName, payload.tags)
+        await workspace.projects.register(payload.path, payload.displayName, payload.tags)
         setIsDialogOpen(false)
       } catch (error) {
         const message = error instanceof Error ? error.message : "Failed to register project."
@@ -163,7 +207,7 @@ function App() {
         setIsSubmittingProject(false)
       }
     },
-    [projects]
+    [workspace.projects]
   )
 
   const handleDeleteProject = useCallback(
@@ -175,13 +219,13 @@ function App() {
         return
       }
       try {
-        await projects.remove(projectToDelete.id)
+        await workspace.projects.remove(projectToDelete.id)
       } catch (error) {
         const message = error instanceof Error ? error.message : "Failed to delete project."
         window.alert(message)
       }
     },
-    [projects]
+    [workspace.projects]
   )
 
   const handleChooseDirectory = useCallback(async (currentPath: string) => {
@@ -196,23 +240,31 @@ function App() {
 
   const handleThreadSelect = useCallback(
     (thread: ThreadListItem) => {
-      threads.select(thread)
       clearAttachments()
+      workspace.threads.select(thread)
+      const targetProjectId = thread.projectId || workspace.projects.active?.id
+      if (targetProjectId) {
+        navigate(`/projects/${targetProjectId}/threads/${thread.id}`)
+      }
     },
-    [clearAttachments, threads]
+    [clearAttachments, navigate, workspace.projects.active?.id, workspace.threads]
   )
 
   const handleNewThread = useCallback(() => {
-    threads.newThread()
+    workspace.threads.newThread()
     setPrompt("")
     clearAttachments()
-  }, [clearAttachments, threads])
+    const active = workspace.projects.active
+    if (active) {
+      navigate(`/projects/${active.id}/threads/new`)
+    }
+  }, [clearAttachments, navigate, workspace.projects.active, workspace.threads])
 
   const handleSendPrompt = useCallback(async () => {
     const trimmed = prompt.trim()
     const hasAttachments = imageAttachments.length > 0
     if (!trimmed && !hasAttachments) {
-      return
+      return undefined
     }
 
     const segments: Array<{ type: "text"; text: string } | { type: "image"; imagePath: string }> = []
@@ -228,7 +280,7 @@ function App() {
     const attachmentPaths = hasAttachments ? imageAttachments.map((attachment) => attachment.path) : []
 
     try {
-      await stream.send({
+      const threadId = await workspace.stream.send({
         content: trimmed,
         model: model.value,
         sandbox: sandbox.value,
@@ -240,14 +292,369 @@ function App() {
       if (hasAttachments) {
         clearAttachments({ deleteFiles: false })
       }
+      return threadId
     } catch (error) {
       const message = error instanceof Error ? error.message : "Failed to send message"
-      stream.setError(message)
+      workspace.stream.setError(message)
+      return undefined
     }
-  }, [clearAttachments, imageAttachments, model.value, prompt, reasoning.value, sandbox.value, stream])
+  }, [clearAttachments, imageAttachments, model.value, prompt, reasoning.value, sandbox.value, workspace.stream])
+
+  const projectIdParam = projectMatch?.params?.projectId ? Number(projectMatch.params.projectId) : null
+
+  useEffect(() => {
+    if (workspace.projects.isLoading) {
+      return
+    }
+    if (projectIdParam && !Number.isNaN(projectIdParam)) {
+      const target = workspace.projects.list.find((project) => project.id === projectIdParam)
+      if (target) {
+        if (!workspace.projects.active || workspace.projects.active.id !== target.id) {
+          void workspace.projects.select(target)
+        }
+        return
+      }
+      if (workspace.projects.list.length > 0) {
+        navigate("/", { replace: true })
+      }
+      return
+    }
+    if (workspace.projects.active) {
+      navigate(`/projects/${workspace.projects.active.id}`, { replace: true })
+      return
+    }
+    if (workspace.projects.list.length > 0) {
+      const first = workspace.projects.list[0]
+      void workspace.projects.select(first)
+      navigate(`/projects/${first.id}`, { replace: true })
+    }
+  }, [
+    navigate,
+    projectIdParam,
+    workspace.projects.active,
+    workspace.projects.isLoading,
+    workspace.projects.list,
+    workspace.projects
+  ])
+
+  useEffect(() => {
+    if (workspace.projects.isLoading || workspace.threads.isLoading) {
+      return
+    }
+    const activeProject = workspace.projects.active
+    if (!activeProject) {
+      return
+    }
+
+    if (isNewThreadRoute) {
+      workspace.threads.newThread()
+      return
+    }
+
+    if (threadIdParam && !Number.isNaN(threadIdParam)) {
+      const target = workspace.threads.list.find((thread) => thread.id === threadIdParam)
+      if (target) {
+        if (!workspace.threads.active || workspace.threads.active.id !== target.id) {
+          workspace.threads.select(threadToListItem(target))
+        }
+        return
+      }
+      navigate(`/projects/${activeProject.id}`, { replace: true })
+      return
+    }
+
+    if (workspace.threads.active && workspace.threads.active.projectId === activeProject.id) {
+      navigate(`/projects/${activeProject.id}/threads/${workspace.threads.active.id}`, { replace: true })
+    }
+  }, [
+    isNewThreadRoute,
+    navigate,
+    threadIdParam,
+    workspace.projects.active,
+    workspace.projects.isLoading,
+    workspace.threads.active,
+    workspace.threads.isLoading,
+    workspace.threads.list,
+    workspace.threads
+  ])
+
+  useEffect(() => {
+    const currentId = isNewThreadRoute
+      ? "new"
+      : threadIdParam && !Number.isNaN(threadIdParam)
+        ? threadIdParam
+        : null
+    if (currentId === lastThreadIdRef.current) {
+      return
+    }
+    lastThreadIdRef.current = currentId
+    setPrompt("")
+    clearAttachments()
+  }, [clearAttachments, isNewThreadRoute, threadIdParam])
+
+  const selectModel = useCallback(
+    (value: string) => {
+      setModel(modelOptions.find((option) => option.value === value) ?? modelOptions[0])
+    },
+    []
+  )
+
+  const selectSandbox = useCallback((value: string) => {
+    setSandbox(sandboxOptions.find((option) => option.value === value) ?? sandboxOptions[0])
+  }, [])
+
+  const selectReasoning = useCallback(
+    (value: string) => {
+      setReasoning(
+        reasoningOptions.find((option) => option.value === value) ?? reasoningOptions[0]
+      )
+    },
+    [reasoningOptions]
+  )
+
+  const sidebarLoading = workspace.projects.isLoading || workspace.threads.isLoading
+
+  const outletContext = useMemo<WorkspaceRouteContext>(
+    () => ({
+      workspace,
+      prompt,
+      setPrompt,
+      imageAttachments,
+      onAddImages: handleComposerAddImages,
+      onRemoveAttachment: handleRemoveAttachment,
+      selectModel,
+      selectSandbox,
+      selectReasoning,
+      model,
+      sandbox,
+      reasoning,
+      reasoningOptions,
+      modelOptions,
+      sandboxOptions,
+      sendPrompt: handleSendPrompt
+    }),
+    [
+      handleComposerAddImages,
+      handleRemoveAttachment,
+      handleSendPrompt,
+      imageAttachments,
+      model,
+      modelOptions,
+      prompt,
+      reasoning,
+      reasoningOptions,
+      sandbox,
+      sandboxOptions,
+      selectModel,
+      selectReasoning,
+      selectSandbox,
+      workspace
+    ]
+  )
+
+  return (
+    <>
+      <WorkspaceShell
+        sidebar={{
+          projects: workspace.projects.list,
+          sections: workspace.threads.sections,
+          activeProject: workspace.projects.active,
+          onProjectChange: handleProjectChange,
+          onProjectDelete: handleDeleteProject,
+          onAddProject: () => {
+            setDialogError(null)
+            setIsDialogOpen(true)
+          },
+          onNewThread: handleNewThread,
+          isLoadingProjects: sidebarLoading,
+          activeThread: workspace.threads.active,
+          onThreadSelect: handleThreadSelect,
+          onThreadRename: workspace.threads.rename,
+          onThreadDelete: workspace.threads.remove
+        }}
+        main={<Outlet context={outletContext} />}
+      />
+
+      <ManageProjectDialog
+        open={isDialogOpen}
+        onOpenChange={setIsDialogOpen}
+        isSubmitting={isSubmittingProject}
+        errorMessage={dialogError}
+        onSubmit={handleRegisterProject}
+        onBrowseForDirectory={handleChooseDirectory}
+      />
+    </>
+  )
+}
+
+function WorkspaceLanding() {
+  return (
+    <div className="flex h-full w-full flex-col items-center justify-center px-8 py-12 text-center text-sm text-muted-foreground">
+      <div className="bg-card px-6 py-8 shadow-sm">
+        <p className="font-medium text-foreground">Select a project to get started.</p>
+        <p className="mt-2 text-muted-foreground">
+          Choose a workspace from the sidebar to view conversations and send messages.
+        </p>
+      </div>
+    </div>
+  )
+}
+
+function ProjectLanding() {
+  const { workspace } = useWorkspaceRouteContext()
+  const hasThreads = workspace.threads.sections.some((section) => section.threads.length > 0)
+  return (
+    <div className="flex h-full w-full flex-col items-center justify-center px-8 py-12 text-center text-sm text-muted-foreground">
+      <div className="bg-card px-6 py-8 shadow-sm">
+        <p className="font-medium text-foreground">
+          {hasThreads ? "Select a conversation to continue." : "No conversations yet for this project."}
+        </p>
+        <p className="mt-2 text-muted-foreground">
+          {hasThreads
+            ? "Pick a thread from the sidebar or start a new one with the composer."
+            : "Start a new conversation to begin working with this project."}
+        </p>
+      </div>
+    </div>
+  )
+}
+
+function NewThreadRoute() {
+  const {
+    workspace,
+    prompt,
+    setPrompt,
+    imageAttachments,
+    onAddImages,
+    onRemoveAttachment,
+    selectModel,
+    selectSandbox,
+    selectReasoning,
+    model,
+    sandbox,
+    reasoning,
+    reasoningOptions,
+    modelOptions,
+    sandboxOptions,
+    sendPrompt
+  } = useWorkspaceRouteContext()
+  const navigate = useNavigate()
+  const params = useParams()
+
+  useEffect(() => {
+    workspace.threads.newThread()
+    workspace.stream.setError(null)
+  }, [workspace])
+
+  const alerts = useMemo(() => {
+    const items: { id: string; message: string; tone?: "info" | "error" }[] = []
+    if (workspace.projects.isLoading || workspace.threads.isLoading) {
+      items.push({ id: "loading", message: "Loading workspace…", tone: "info" })
+    }
+    if (workspace.projects.error) {
+      items.push({ id: "projects-error", message: workspace.projects.error, tone: "error" })
+    }
+    if (workspace.threads.error) {
+      items.push({ id: "threads-error", message: workspace.threads.error, tone: "error" })
+    }
+    return items
+  }, [workspace.projects.error, workspace.projects.isLoading, workspace.threads.error, workspace.threads.isLoading])
 
   const hasDraftContent = prompt.trim().length > 0 || imageAttachments.length > 0
-  const canSend = Boolean(hasDraftContent && projects.active && !stream.isStreaming)
+  const canSend = Boolean(hasDraftContent && workspace.projects.active && !workspace.stream.isStreaming)
+
+  const handleSend = useCallback(async () => {
+    const threadId = await sendPrompt()
+    if (threadId && params.projectId) {
+      navigate(`/projects/${params.projectId}/threads/${threadId}`, { replace: true })
+    }
+  }, [navigate, params.projectId, sendPrompt])
+
+  return (
+    <div className="flex h-full min-h-0 w-full flex-col">
+      {alerts.length > 0 && (
+        <div className="mb-4 flex flex-col gap-3">
+          <WorkspaceAlerts alerts={alerts} />
+        </div>
+      )}
+      <div className="flex flex-1 min-h-0 flex-col overflow-hidden">
+        <div className="flex flex-1 min-h-0 flex-col overflow-hidden">
+          <ConversationPane
+            projectName={workspace.projects.active?.name ?? "Workspace"}
+            thread={null}
+            entries={[]}
+            isStreaming={workspace.stream.isStreaming}
+            streamStatus={workspace.stream.status}
+          />
+          <div className="border-t border-border/70 bg-white px-4 py-4">
+            <ComposerPanel
+              projectName={workspace.projects.active?.name ?? "Workspace"}
+              prompt={prompt}
+              onPromptChange={setPrompt}
+              attachments={imageAttachments}
+              onAddImages={onAddImages}
+              onRemoveAttachment={onRemoveAttachment}
+              onSend={() => {
+                void handleSend()
+              }}
+              onStop={workspace.stream.cancel}
+              canSend={canSend}
+              isStreaming={workspace.stream.isStreaming}
+              model={model}
+              reasoning={reasoning}
+              sandbox={sandbox}
+              modelOptions={modelOptions}
+              reasoningOptions={reasoningOptions}
+              sandboxOptions={sandboxOptions}
+              onModelChange={selectModel}
+              onReasoningChange={selectReasoning}
+              onSandboxChange={selectSandbox}
+              usage={workspace.stream.usage}
+              status={workspace.stream.status}
+              errorMessage={workspace.stream.error}
+              todoList={null}
+            />
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function ProjectOutletBridge() {
+  const context = useWorkspaceRouteContext()
+  return <Outlet context={context} />
+}
+
+function ThreadRoute() {
+  const {
+    workspace,
+    prompt,
+    setPrompt,
+    imageAttachments,
+    onAddImages,
+    onRemoveAttachment,
+    selectModel,
+    selectSandbox,
+    selectReasoning,
+    model,
+    sandbox,
+    reasoning,
+    reasoningOptions,
+    modelOptions,
+    sandboxOptions,
+    sendPrompt
+  } = useWorkspaceRouteContext()
+
+  const { projects, threads, conversation, stream, selection } = workspace
+
+  if (!projects.active || !selection.thread) {
+    return (
+      <div className="flex h-full w-full items-center justify-center text-sm text-muted-foreground">
+        Loading conversation…
+      </div>
+    )
+  }
 
   const alerts = useMemo(() => {
     const items: { id: string; message: string; tone?: "info" | "error" }[] = []
@@ -263,63 +670,9 @@ function App() {
     return items
   }, [projects.error, projects.isLoading, threads.error, threads.isLoading])
 
-  const mainContent = useMemo(() => {
-    if (!projects.active) {
-      return (
-        <div className="flex h-full w-full flex-col items-center justify-center px-8 py-12 text-center text-sm text-muted-foreground">
-          <div className=" bg-card px-6 py-8 shadow-sm">
-            <p className="font-medium text-foreground">Select a project to get started.</p>
-            <p className="mt-2 text-muted-foreground">
-              Choose a workspace from the sidebar to view conversations and send messages.
-            </p>
-          </div>
-        </div>
-      )
-    }
+  const hasDraftContent = prompt.trim().length > 0 || imageAttachments.length > 0
+  const canSend = Boolean(hasDraftContent && projects.active && !stream.isStreaming)
 
-    return (
-      <div className="flex h-full min-h-0 w-full flex-col">
-        {alerts.length > 0 && (
-          <div className="mb-4 flex flex-col gap-3">
-            <WorkspaceAlerts alerts={alerts} />
-          </div>
-        )}
-        <div className="flex flex-1 min-h-0 flex-col overflow-hidden">
-          <ResizablePanelGroup direction="horizontal" className="flex h-full min-h-0 w-full">
-            <ResizablePanel defaultSize={70} minSize={40} className="min-w-0 min-h-0">
-              <div className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden">
-                <ConversationPane
-                  projectName={projects.active.name}
-                  thread={selection.thread}
-                  entries={conversation.list}
-                  isStreaming={stream.isStreaming}
-                  streamStatus={stream.status}
-                />
-              </div>
-            </ResizablePanel>
-            <ResizableHandle withHandle />
-            <ResizablePanel defaultSize={30} minSize={25} className="min-w-[300px] max-w-[520px] min-h-0">
-              <ResizablePanelGroup direction="vertical" className="flex h-full min-h-0 w-full flex-col">
-                <ResizablePanel defaultSize={50} minSize={30} className="min-h-0">
-                  <div className="flex h-full min-h-0 flex-col">
-                    <FilesPanel threadId={selection.thread?.id} />
-                  </div>
-                </ResizablePanel>
-                <ResizableHandle withHandle />
-                <ResizablePanel defaultSize={50} minSize={30} className="min-h-0">
-                  <div className="flex h-full min-h-0 flex-col">
-                    <ThreadTerminal threadId={selection.thread?.id} />
-                  </div>
-                </ResizablePanel>
-              </ResizablePanelGroup>
-            </ResizablePanel>
-          </ResizablePanelGroup>
-        </div>
-      </div>
-    )
-  }, [alerts, conversation.list, projects.active, selection.thread, stream.isStreaming, stream.status])
-
-  // derive the latest todo list from conversation entries
   const latestTodoList = useMemo(() => {
     for (let index = conversation.list.length - 1; index >= 0; index -= 1) {
       const entry = conversation.list[index]
@@ -332,76 +685,97 @@ function App() {
   }, [conversation.list])
 
   return (
-    <>
-      <WorkspaceShell
-        sidebar={{
-          projects: projects.list,
-          sections: threads.sections,
-          activeProject: projects.active,
-          onProjectChange: handleProjectChange,
-          onProjectDelete: handleDeleteProject,
-          onAddProject: () => {
-            setDialogError(null)
-            setIsDialogOpen(true)
-          },
-          onNewThread: handleNewThread,
-          isLoadingProjects: projects.isLoading || threads.isLoading,
-          activeThread: threads.active,
-          onThreadSelect: handleThreadSelect,
-          onThreadRename: threads.rename,
-          onThreadDelete: threads.remove
-        }}
-        main={mainContent}
-        footer={
-          <ComposerPanel
-            projectName={projects.active?.name ?? "Workspace"}
-            prompt={prompt}
-            onPromptChange={setPrompt}
-            attachments={imageAttachments}
-            onAddImages={handleComposerAddImages}
-            onRemoveAttachment={handleRemoveAttachment}
-            onSend={handleSendPrompt}
-            onStop={stream.cancel}
-            canSend={canSend}
-            isStreaming={stream.isStreaming}
-            model={model}
-            reasoning={reasoning}
-            sandbox={sandbox}
-            modelOptions={modelOptions}
-            reasoningOptions={reasoningOptions}
-            sandboxOptions={sandboxOptions}
-            onModelChange={(value) =>
-              setModel(modelOptions.find((option) => option.value === value) ?? modelOptions[0])
-            }
-            onReasoningChange={(value) =>
-              setReasoning(
-                reasoningOptions.find((option) => option.value === value) ?? reasoningOptions[0]
-              )
-            }
-          onSandboxChange={(value) =>
-            setSandbox(sandboxOptions.find((option) => option.value === value) ?? sandboxOptions[0])
-          }
-          usage={stream.usage}
-          status={stream.status}
-          errorMessage={stream.error}
-          todoList={latestTodoList}
-          />
-        }
-      />
-
-      <ManageProjectDialog
-        open={isDialogOpen}
-        onOpenChange={setIsDialogOpen}
-        isSubmitting={isSubmittingProject}
-        errorMessage={dialogError}
-        onSubmit={handleRegisterProject}
-        onBrowseForDirectory={handleChooseDirectory}
-      />
-    </>
+    <div className="flex h-full min-h-0 w-full flex-col">
+      {alerts.length > 0 && (
+        <div className="mb-4 flex flex-col gap-3">
+          <WorkspaceAlerts alerts={alerts} />
+        </div>
+      )}
+      <div className="flex flex-1 min-h-0 flex-col overflow-hidden">
+        <ResizablePanelGroup direction="horizontal" className="flex h-full min-h-0 w-full">
+          <ResizablePanel defaultSize={70} minSize={40} className="min-w-0 min-h-0">
+            <div className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden">
+              <ConversationPane
+                projectName={projects.active.name}
+                thread={selection.thread}
+                entries={conversation.list}
+                isStreaming={stream.isStreaming}
+                streamStatus={stream.status}
+              />
+              <div className="border-t border-border/70 bg-white px-4 py-4">
+                <ComposerPanel
+                  projectName={projects.active.name}
+                  prompt={prompt}
+                  onPromptChange={setPrompt}
+                  attachments={imageAttachments}
+                  onAddImages={onAddImages}
+                  onRemoveAttachment={onRemoveAttachment}
+                  onSend={() => {
+                    void sendPrompt()
+                  }}
+                  onStop={stream.cancel}
+                  canSend={canSend}
+                  isStreaming={stream.isStreaming}
+                  model={model}
+                  reasoning={reasoning}
+                  sandbox={sandbox}
+                  modelOptions={modelOptions}
+                  reasoningOptions={reasoningOptions}
+                  sandboxOptions={sandboxOptions}
+                  onModelChange={selectModel}
+                  onReasoningChange={selectReasoning}
+                  onSandboxChange={selectSandbox}
+                  usage={stream.usage}
+                  status={stream.status}
+                  errorMessage={stream.error}
+                  todoList={latestTodoList}
+                />
+              </div>
+            </div>
+          </ResizablePanel>
+          <ResizableHandle withHandle />
+          <ResizablePanel defaultSize={30} minSize={25} className="min-w-[300px] max-w-[520px] min-h-0">
+            <ResizablePanelGroup direction="vertical" className="flex h-full min-h-0 w-full flex-col">
+              <ResizablePanel defaultSize={50} minSize={30} className="min-h-0">
+                <div className="flex h-full min-h-0 flex-col">
+                  <FilesPanel threadId={selection.thread?.id} />
+                </div>
+              </ResizablePanel>
+              <ResizableHandle withHandle />
+              <ResizablePanel defaultSize={50} minSize={30} className="min-h-0">
+                <div className="flex h-full min-h-0 flex-col">
+                  <ThreadTerminal threadId={selection.thread?.id} />
+                </div>
+              </ResizablePanel>
+            </ResizablePanelGroup>
+          </ResizablePanel>
+        </ResizablePanelGroup>
+      </div>
+    </div>
   )
 }
 
-export default App
+function useWorkspaceRouteContext() {
+  return useOutletContext<WorkspaceRouteContext>()
+}
+
+export default function App() {
+  return (
+    <Routes>
+      <Route path="/" element={<WorkspaceLayout />}>
+        <Route index element={<WorkspaceLanding />} />
+        <Route path="projects/:projectId" element={<ProjectOutletBridge />}>
+          <Route index element={<ProjectLanding />} />
+          <Route path="threads">
+            <Route path="new" element={<NewThreadRoute />} />
+            <Route path=":threadId" element={<ThreadRoute />} />
+          </Route>
+        </Route>
+      </Route>
+      <Route path="*" element={<Navigate to="/" replace />} />
+    </Routes>
+  )
+}
 
 function createAttachmentId(): string {
   if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
@@ -440,30 +814,25 @@ function inferImageMimeType(file: File): string | null {
   if (name.endsWith(".svg")) {
     return "image/svg+xml"
   }
-  if (file.size > 0) {
-    return "image/png"
-  }
   return null
 }
 
-async function readFileAsBase64(file: File): Promise<string> {
+function readFileAsBase64(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader()
     reader.onload = () => {
       const result = reader.result
-      if (typeof result !== "string") {
-        reject(new Error("Unexpected file reader result"))
-        return
+      if (typeof result === "string") {
+        const base64 = result.split(",")[1]
+        if (base64) {
+          resolve(base64)
+          return
+        }
       }
-      const [, base64 = ""] = result.split(",", 2)
-      if (!base64) {
-        reject(new Error("Unable to read image data from clipboard"))
-        return
-      }
-      resolve(base64)
+      reject(new Error("Invalid image data"))
     }
     reader.onerror = () => {
-      reject(reader.error ?? new Error("Failed to read clipboard image"))
+      reject(new Error("Failed to read file"))
     }
     reader.readAsDataURL(file)
   })

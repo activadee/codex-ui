@@ -117,6 +117,7 @@ export function threadToListItem(thread: AgentThread): ThreadListItem {
   const formatted = formatTimestamp(timestampSource)
   return {
     id: thread.id,
+    projectId: thread.projectId,
     title: thread.title,
     preview: thread.preview,
     timestamp: formatted,
