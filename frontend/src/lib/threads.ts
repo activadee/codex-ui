@@ -138,7 +138,6 @@ export function threadToListItem(thread: AgentThread): ThreadListItem {
     status: thread.status,
     statusLabel: getStatusLabel(thread.status),
     progressText: buildProgressText(thread.status, timestampSource),
-    meta: `Model · ${thread.model}`,
     branch: thread.branch ?? thread.branchName ?? undefined,
     pullRequestNumber: thread.pullRequestNumber,
     diffStat: thread.diffStat
