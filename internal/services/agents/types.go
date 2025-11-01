@@ -152,7 +152,8 @@ type ThreadDTO struct {
     ProjectID      int64   `json:"projectId"`
     ExternalID     string  `json:"externalId,omitempty"`
     WorktreePath   string  `json:"worktreePath,omitempty"`
-    BranchName     string  `json:"branchName,omitempty"`
+	BranchName     string  `json:"branchName,omitempty"`
+	PRURL          string  `json:"prUrl,omitempty"`
     Title          string  `json:"title"`
     Model          string  `json:"model"`
     SandboxMode    string  `json:"sandboxMode"`
