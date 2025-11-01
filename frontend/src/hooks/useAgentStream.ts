@@ -142,11 +142,18 @@ export function useAgentStream(options: UseAgentStreamOptions = {}) {
       const current = threadStatesRef.current[targetThreadId]
       let streamId = current?.streamId
       if (!streamId) {
-        const fallback = Array.from(streamThreadMap.current.entries()).find(([, id]) => id === targetThreadId)
-        if (!fallback) {
-          return
+        const entries = Array.from(streamThreadMap.current.entries())
+        const match = entries.find(([, id]) => id === targetThreadId)
+        if (match) {
+          streamId = match[0]
+        } else {
+          if (entries.length !== 1) {
+            return
+          }
+          const [fallbackStreamId, fallbackThreadId] = entries[0]
+          streamId = fallbackStreamId
+          targetThreadId = fallbackThreadId
         }
-        streamId = fallback[0]
       }
       try {
         const response = await CancelAgentStream(streamId)
