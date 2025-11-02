@@ -85,6 +85,12 @@ type FileDiffStatDTO struct {
 	Status  string `json:"status,omitempty"`
 }
 
+// DiffSummaryDTO aggregates additions/removals across a diff set.
+type DiffSummaryDTO struct {
+	Added   int `json:"added"`
+	Removed int `json:"removed"`
+}
+
 // ToolCallDTO summarises an MCP tool invocation.
 type ToolCallDTO struct {
 	Server string `json:"server"`
@@ -148,20 +154,23 @@ type ConversationEntryDTO struct {
 
 // ThreadDTO mirrors persisted thread data for the frontend.
 type ThreadDTO struct {
-    ID             int64   `json:"id"`
-    ProjectID      int64   `json:"projectId"`
-    ExternalID     string  `json:"externalId,omitempty"`
-    WorktreePath   string  `json:"worktreePath,omitempty"`
-	BranchName     string  `json:"branchName,omitempty"`
-	PRURL          string  `json:"prUrl,omitempty"`
-    Title          string  `json:"title"`
-    Model          string  `json:"model"`
-    SandboxMode    string  `json:"sandboxMode"`
-    ReasoningLevel string  `json:"reasoningLevel"`
-    Status         string  `json:"status"`
-	CreatedAt      string  `json:"createdAt"`
-	UpdatedAt      string  `json:"updatedAt"`
-	LastMessageAt  *string `json:"lastMessageAt,omitempty"`
+	ID             int64           `json:"id"`
+	ProjectID      int64           `json:"projectId"`
+	ExternalID     string          `json:"externalId,omitempty"`
+	WorktreePath   string          `json:"worktreePath,omitempty"`
+	BranchName     string          `json:"branchName,omitempty"`
+	PRURL          string          `json:"prUrl,omitempty"`
+	Title          string          `json:"title"`
+	Model          string          `json:"model"`
+	SandboxMode    string          `json:"sandboxMode"`
+	ReasoningLevel string          `json:"reasoningLevel"`
+	Status         string          `json:"status"`
+	CreatedAt      string          `json:"createdAt"`
+	UpdatedAt      string          `json:"updatedAt"`
+	LastMessageAt  *string         `json:"lastMessageAt,omitempty"`
+	Branch         string          `json:"branch,omitempty"`
+	PullRequest    *int            `json:"pullRequestNumber,omitempty"`
+	DiffSummary    *DiffSummaryDTO `json:"diffStat,omitempty"`
 }
 
 // CancelResponse reports the updated status after stopping a stream.

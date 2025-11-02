@@ -14,7 +14,14 @@ export type AgentThread = {
   projectId: number
   externalId?: string
   worktreePath?: string
+  branchName?: string
   prUrl?: string
+  branch?: string
+  pullRequestNumber?: number
+  diffStat?: {
+    added: number
+    removed: number
+  }
   title: string
   model: string
   sandboxMode: string
@@ -41,11 +48,18 @@ export type ThreadListItem = {
   preview: string
   timestamp: string
   relativeTimestamp: string
+  lastActivityAt?: string
   model: string
   status: ThreadStatus
   statusLabel: string
   progressText: string
   meta?: string
+  branch?: string
+  pullRequestNumber?: number
+  diffStat?: {
+    added: number
+    removed: number
+  }
 }
 
 export type ThreadSection = {

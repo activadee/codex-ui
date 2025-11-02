@@ -198,13 +198,13 @@ func (s *Service) Send(ctx context.Context, req MessageRequest) (*Stream, discov
 		if perr != nil {
 			return nil, discovery.Thread{}, perr
 		}
-    // Build descriptive naming for worktree dir + branch
-    nameHint := thread.Title
-    branchName := thread.BranchName
-    wtPath, workingDir, _, werr := s.worktrees.EnsureForThread(ctx, project.Path, thread.ID, nameHint, branchName)
-    if werr != nil {
-        return nil, discovery.Thread{}, werr
-    }
+		// Build descriptive naming for worktree dir + branch
+		nameHint := thread.Title
+		branchName := thread.BranchName
+		wtPath, workingDir, _, werr := s.worktrees.EnsureForThread(ctx, project.Path, thread.ID, nameHint, branchName)
+		if werr != nil {
+			return nil, discovery.Thread{}, werr
+		}
 		_ = s.repo.UpdateThreadWorktreePath(ctx, thread.ID, wtPath)
 		thread.WorktreePath = wtPath
 		req.ThreadOptions.WorkingDirectory = workingDir
@@ -414,7 +414,11 @@ func (s *Service) ListThreads(ctx context.Context, projectID int64) ([]ThreadDTO
 	}
 	dtos := make([]ThreadDTO, 0, len(records))
 	for _, record := range records {
-		dtos = append(dtos, toThreadDTO(record))
+		dto := toThreadDTO(record)
+		if summary := s.computeDiffSummary(ctx, record.WorktreePath); summary != nil {
+			dto.DiffSummary = summary
+		}
+		dtos = append(dtos, dto)
 	}
 	return dtos, nil
 }
@@ -428,7 +432,11 @@ func (s *Service) GetThread(ctx context.Context, id int64) (ThreadDTO, error) {
 	if err != nil {
 		return ThreadDTO{}, err
 	}
-	return toThreadDTO(record), nil
+	dto := toThreadDTO(record)
+	if summary := s.computeDiffSummary(ctx, record.WorktreePath); summary != nil {
+		dto.DiffSummary = summary
+	}
+	return dto, nil
 }
 
 // ListThreadDiffStats returns git diff statistics for a thread worktree.
@@ -444,6 +452,28 @@ func (s *Service) ListThreadDiffStats(ctx context.Context, threadID int64) ([]Fi
 		return nil, fmt.Errorf("thread %d has no worktree", threadID)
 	}
 	return collectGitDiffStats(ctx, thread.WorktreePath)
+}
+
+func (s *Service) computeDiffSummary(ctx context.Context, worktreePath string) *DiffSummaryDTO {
+    if strings.TrimSpace(worktreePath) == "" {
+        return nil
+    }
+    // Guard against slow git calls blocking list/get requests
+    tctx, cancel := context.WithTimeout(ctx, 250*time.Millisecond)
+    defer cancel()
+    stats, err := collectGitDiffStats(tctx, worktreePath)
+    if err != nil {
+        return nil
+    }
+	var added, removed int
+	for _, stat := range stats {
+		added += stat.Added
+		removed += stat.Removed
+	}
+	if added == 0 && removed == 0 {
+		return nil
+	}
+	return &DiffSummaryDTO{Added: added, Removed: removed}
 }
 
 // LoadThreadConversation returns the persisted transcript for a thread.

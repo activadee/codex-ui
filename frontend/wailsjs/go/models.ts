@@ -245,6 +245,20 @@ export namespace agents {
 		    return a;
 		}
 	}
+	export class DiffSummaryDTO {
+	    added: number;
+	    removed: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new DiffSummaryDTO(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.added = source["added"];
+	        this.removed = source["removed"];
+	    }
+	}
 	
 	
 	export class FileDiffStatDTO {
@@ -363,6 +377,7 @@ export namespace agents {
 	    projectId: number;
 	    externalId?: string;
 	    worktreePath?: string;
+	    branchName?: string;
 	    prUrl?: string;
 	    title: string;
 	    model: string;
@@ -372,6 +387,9 @@ export namespace agents {
 	    createdAt: string;
 	    updatedAt: string;
 	    lastMessageAt?: string;
+	    branch?: string;
+	    pullRequestNumber?: number;
+	    diffStat?: DiffSummaryDTO;
 	
 	    static createFrom(source: any = {}) {
 	        return new ThreadDTO(source);
@@ -383,6 +401,7 @@ export namespace agents {
 	        this.projectId = source["projectId"];
 	        this.externalId = source["externalId"];
 	        this.worktreePath = source["worktreePath"];
+	        this.branchName = source["branchName"];
 	        this.prUrl = source["prUrl"];
 	        this.title = source["title"];
 	        this.model = source["model"];
@@ -392,7 +411,28 @@ export namespace agents {
 	        this.createdAt = source["createdAt"];
 	        this.updatedAt = source["updatedAt"];
 	        this.lastMessageAt = source["lastMessageAt"];
+	        this.branch = source["branch"];
+	        this.pullRequestNumber = source["pullRequestNumber"];
+	        this.diffStat = this.convertValues(source["diffStat"], DiffSummaryDTO);
 	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
 	}
 	
 	
