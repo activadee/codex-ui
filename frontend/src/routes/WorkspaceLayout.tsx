@@ -169,14 +169,30 @@ export default function WorkspaceLayout() {
 
   // Sync composer selections to the active thread's saved options
   useEffect(() => {
-    const t = workspace.selection.thread
-    if (!t) return
-    // model first (reasoning options depend on it)  
-    if (t.model && t.model !== composer.model.value) composer.setModelValue(t.model)
-    if (t.sandboxMode && t.sandboxMode !== composer.sandbox.value) composer.setSandboxValue(t.sandboxMode)
-    if (t.reasoningLevel && t.reasoningLevel !== composer.reasoning.value) composer.setReasoningValue(t.reasoningLevel)
-    // eslint-disable-next-line react-hooks/exhaustive-deps  
-  }, [workspace.selection.thread])  
+    const thread = workspace.selection.thread
+    if (!thread) return
+    if (thread.model && thread.model !== composer.model.value) {
+      composer.setModelValue(thread.model)
+    }
+    if (thread.sandboxMode && thread.sandboxMode !== composer.sandbox.value) {
+      composer.setSandboxValue(thread.sandboxMode)
+    }
+  }, [
+    workspace.selection.thread,
+    composer.model.value,
+    composer.sandbox.value,
+    composer.setModelValue,
+    composer.setSandboxValue
+  ])
+
+  useEffect(() => {
+    const thread = workspace.selection.thread
+    if (!thread || !thread.reasoningLevel) return
+    if (thread.model && thread.model !== composer.model.value) {
+      return
+    }
+    composer.setReasoningValue(thread.reasoningLevel)
+  }, [workspace.selection.thread, composer.model.value, composer.reasoningOptions, composer.setReasoningValue])
 
   return (
     <>
