@@ -1,4 +1,4 @@
-import { useCallback, useMemo } from "react"
+import { useCallback, useEffect, useMemo } from "react"
 import { Outlet, useNavigate } from "react-router-dom"
 
 import { WorkspaceShell } from "@/components/app/workspace-shell"
@@ -166,6 +166,17 @@ export default function WorkspaceLayout() {
     sandboxOptions: composer.sandboxOptions,
     sendPrompt: handleSendPrompt
   }
+
+  // Sync composer selections to the active thread's saved options
+  useEffect(() => {
+    const t = workspace.selection.thread
+    if (!t) return
+    // model first (reasoning options depend on it)
+    if (t.model) composer.setModelValue(t.model)
+    if (t.sandboxMode) composer.setSandboxValue(t.sandboxMode)
+    if (t.reasoningLevel) composer.setReasoningValue(t.reasoningLevel)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [workspace.selection.thread])
 
   return (
     <>
