@@ -192,7 +192,7 @@ export default function WorkspaceLayout() {
       return
     }
     composer.setReasoningValue(thread.reasoningLevel)
-  }, [workspace.selection.thread, composer.model.value, composer.reasoningOptions, composer.setReasoningValue])
+  }, [workspace.selection.thread?.id, workspace.selection.thread?.reasoningLevel, composer.model.value, composer.setReasoningValue])
 
   return (
     <>
