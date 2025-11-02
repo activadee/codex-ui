@@ -363,6 +363,7 @@ export namespace agents {
 	    projectId: number;
 	    externalId?: string;
 	    worktreePath?: string;
+	    branchName?: string;
 	    prUrl?: string;
 	    title: string;
 	    model: string;
@@ -383,6 +384,7 @@ export namespace agents {
 	        this.projectId = source["projectId"];
 	        this.externalId = source["externalId"];
 	        this.worktreePath = source["worktreePath"];
+	        this.branchName = source["branchName"];
 	        this.prUrl = source["prUrl"];
 	        this.title = source["title"];
 	        this.model = source["model"];
@@ -399,23 +401,6 @@ export namespace agents {
 	
 	
 	
-
-}
-
-export namespace main {
-	
-	export class TerminalHandle {
-	    threadId: number;
-	
-	    static createFrom(source: any = {}) {
-	        return new TerminalHandle(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.threadId = source["threadId"];
-	    }
-	}
 
 }
 
@@ -459,6 +444,23 @@ export namespace projects {
 	        this.path = source["path"];
 	        this.displayName = source["displayName"];
 	        this.tags = source["tags"];
+	    }
+	}
+
+}
+
+export namespace terminal {
+	
+	export class Handle {
+	    threadId: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new Handle(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.threadId = source["threadId"];
 	    }
 	}
 
