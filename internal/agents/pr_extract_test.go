@@ -40,4 +40,3 @@ func TestExtractPRURLFromEvent_None(t *testing.T) {
         t.Fatalf("expected empty string, got %s", got)
     }
 }
-

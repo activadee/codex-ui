@@ -11,8 +11,8 @@ import (
 	"strings"
 	"sync"
 
+	"codex-ui/internal/git/worktrees"
 	"codex-ui/internal/storage/discovery"
-	"codex-ui/internal/worktrees"
 	"time"
 
 	"github.com/google/uuid"
@@ -198,13 +198,13 @@ func (s *Service) Send(ctx context.Context, req MessageRequest) (*Stream, discov
 		if perr != nil {
 			return nil, discovery.Thread{}, perr
 		}
-    // Build descriptive naming for worktree dir + branch
-    nameHint := thread.Title
-    branchName := thread.BranchName
-    wtPath, workingDir, _, werr := s.worktrees.EnsureForThread(ctx, project.Path, thread.ID, nameHint, branchName)
-    if werr != nil {
-        return nil, discovery.Thread{}, werr
-    }
+		// Build descriptive naming for worktree dir + branch
+		nameHint := thread.Title
+		branchName := thread.BranchName
+		wtPath, workingDir, _, werr := s.worktrees.EnsureForThread(ctx, project.Path, thread.ID, nameHint, branchName)
+		if werr != nil {
+			return nil, discovery.Thread{}, werr
+		}
 		_ = s.repo.UpdateThreadWorktreePath(ctx, thread.ID, wtPath)
 		thread.WorktreePath = wtPath
 		req.ThreadOptions.WorkingDirectory = workingDir
