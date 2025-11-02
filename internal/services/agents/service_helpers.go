@@ -23,14 +23,32 @@ func (s *Service) prepareThread(ctx context.Context, req *MessageRequest) (disco
 		return discovery.Thread{}, err
 	}
 
-	if req.ThreadID != 0 {
-		thread, err := s.repo.GetThread(ctx, req.ThreadID)
-		if err != nil {
-			return discovery.Thread{}, err
-		}
-		req.ThreadExternalID = thread.ExternalID
-		return thread, nil
-	}
+    if req.ThreadID != 0 {
+        thread, err := s.repo.GetThread(ctx, req.ThreadID)
+        if err != nil {
+            return discovery.Thread{}, err
+        }
+        // Persist latest thread options if they changed (keep per-thread preferences in sync)
+        // We only attempt update when a model is provided (UI always sends one)
+        if strings.TrimSpace(req.ThreadOptions.Model) != "" && (
+            req.ThreadOptions.Model != thread.Model ||
+            req.ThreadOptions.SandboxMode != thread.SandboxMode ||
+            req.ThreadOptions.ReasoningLevel != thread.ReasoningLevel,
+        ) {
+            if uerr := s.repo.UpdateThreadOptions(ctx, thread.ID,
+                req.ThreadOptions.Model,
+                req.ThreadOptions.SandboxMode,
+                req.ThreadOptions.ReasoningLevel,
+            ); uerr == nil {
+                // refresh snapshot if update succeeded
+                if updated, gerr := s.repo.GetThread(ctx, thread.ID); gerr == nil {
+                    thread = updated
+                }
+            }
+        }
+        req.ThreadExternalID = thread.ExternalID
+        return thread, nil
+    }
 
 	if req.ProjectID == 0 {
 		return discovery.Thread{}, errors.New("projectId is required for new threads")
