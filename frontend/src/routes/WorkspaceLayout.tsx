@@ -171,12 +171,12 @@ export default function WorkspaceLayout() {
   useEffect(() => {
     const t = workspace.selection.thread
     if (!t) return
-    // model first (reasoning options depend on it)
-    if (t.model) composer.setModelValue(t.model)
-    if (t.sandboxMode) composer.setSandboxValue(t.sandboxMode)
-    if (t.reasoningLevel) composer.setReasoningValue(t.reasoningLevel)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [workspace.selection.thread])
+    // model first (reasoning options depend on it)  
+    if (t.model && t.model !== composer.model.value) composer.setModelValue(t.model)
+    if (t.sandboxMode && t.sandboxMode !== composer.sandbox.value) composer.setSandboxValue(t.sandboxMode)
+    if (t.reasoningLevel && t.reasoningLevel !== composer.reasoning.value) composer.setReasoningValue(t.reasoningLevel)
+    // eslint-disable-next-line react-hooks/exhaustive-deps  
+  }, [workspace.selection.thread])  
 
   return (
     <>
