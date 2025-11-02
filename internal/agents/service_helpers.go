@@ -3,6 +3,9 @@ package agents
 import (
 	"context"
 	"errors"
+	"fmt"
+	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -49,11 +52,9 @@ func (s *Service) prepareThread(ctx context.Context, req *MessageRequest) (disco
 	if err != nil {
 		return discovery.Thread{}, err
 	}
-	// Persist a stable, descriptive branch name for this thread
+	// Persist a stable, descriptive branch name for this thread (best effort)
 	if err := s.repo.UpdateThreadBranchName(ctx, thread.ID, worktrees.BranchName(title, thread.ID)); err == nil {
-		// Best-effort set on returned object; non-fatal if it fails later
-		updated, _ := s.repo.GetThread(ctx, thread.ID)
-		if updated.ID == thread.ID {
+		if updated, getErr := s.repo.GetThread(ctx, thread.ID); getErr == nil && updated.ID == thread.ID {
 			thread = updated
 		}
 	}
@@ -122,9 +123,38 @@ func toThreadDTO(record discovery.Thread) ThreadDTO {
 		CreatedAt:      record.CreatedAt.Format(time.RFC3339),
 		UpdatedAt:      record.UpdatedAt.Format(time.RFC3339),
 	}
+	branch := strings.TrimSpace(record.BranchName)
+	if branch == "" {
+		branch = fmt.Sprintf("codex/thread/%d", record.ID)
+	}
+	dto.Branch = branch
+	if pr := parsePullRequestNumber(record.PRURL, record.ExternalID); pr != nil {
+		dto.PullRequest = pr
+	}
 	if record.LastMessageAt != nil {
 		formatted := record.LastMessageAt.Format(time.RFC3339)
 		dto.LastMessageAt = &formatted
 	}
 	return dto
+}
+
+var pullRequestExtractor = regexp.MustCompile(`(?i)(?:pr|pull(?:_request)?)[^0-9]*(\d+)`)
+
+func parsePullRequestNumber(values ...string) *int {
+	for _, value := range values {
+		value = strings.TrimSpace(value)
+		if value == "" {
+			continue
+		}
+		matches := pullRequestExtractor.FindStringSubmatch(value)
+		if len(matches) < 2 {
+			continue
+		}
+		parsed, err := strconv.Atoi(matches[1])
+		if err != nil {
+			continue
+		}
+		return &parsed
+	}
+	return nil
 }
