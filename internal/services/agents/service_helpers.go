@@ -29,16 +29,25 @@ func (s *Service) prepareThread(ctx context.Context, req *MessageRequest) (disco
 			return discovery.Thread{}, err
 		}
 		// Persist latest thread options if they changed (keep per-thread preferences in sync)
-		// Only attempt update when a model is provided (UI always sends one)
-		if strings.TrimSpace(req.ThreadOptions.Model) != "" && (req.ThreadOptions.Model != thread.Model ||
-			req.ThreadOptions.SandboxMode != thread.SandboxMode ||
-			req.ThreadOptions.ReasoningLevel != thread.ReasoningLevel) {
+		resolvedModel := strings.TrimSpace(req.ThreadOptions.Model)
+		if resolvedModel == "" {
+			resolvedModel = thread.Model
+		}
+		resolvedSandbox := strings.TrimSpace(req.ThreadOptions.SandboxMode)
+		if resolvedSandbox == "" {
+			resolvedSandbox = thread.SandboxMode
+		}
+		resolvedReasoning := strings.TrimSpace(req.ThreadOptions.ReasoningLevel)
+		if resolvedReasoning == "" {
+			resolvedReasoning = thread.ReasoningLevel
+		}
+		if resolvedModel != thread.Model || resolvedSandbox != thread.SandboxMode || resolvedReasoning != thread.ReasoningLevel {
 			if err := s.repo.UpdateThreadOptions(
 				ctx,
 				thread.ID,
-				req.ThreadOptions.Model,
-				req.ThreadOptions.SandboxMode,
-				req.ThreadOptions.ReasoningLevel,
+				resolvedModel,
+				resolvedSandbox,
+				resolvedReasoning,
 			); err != nil {
 				return discovery.Thread{}, err
 			}
@@ -48,6 +57,9 @@ func (s *Service) prepareThread(ctx context.Context, req *MessageRequest) (disco
 			}
 			thread = updated
 		}
+		req.ThreadOptions.Model = resolvedModel
+		req.ThreadOptions.SandboxMode = resolvedSandbox
+		req.ThreadOptions.ReasoningLevel = resolvedReasoning
 		req.ThreadExternalID = thread.ExternalID
 		return thread, nil
 	}
