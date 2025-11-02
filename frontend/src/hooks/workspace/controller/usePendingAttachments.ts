@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef } from "react"
 
-import { DeleteAttachment } from "../../../../wailsjs/go/main/App"
+import { DeleteAttachment } from "../../../../wailsjs/go/attachments/API"
 
 export function usePendingAttachments() {
   const pendingAttachmentsRef = useRef<Map<string, string[]>>(new Map())

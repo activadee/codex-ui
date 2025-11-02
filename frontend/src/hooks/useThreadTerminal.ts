@@ -1,11 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react"
 
-import {
-  ResizeThreadTerminal,
-  StartThreadTerminal,
-  StopThreadTerminal,
-  WriteThreadTerminal
-} from "../../wailsjs/go/main/App"
+import { Resize, Start, Stop, Write } from "../../wailsjs/go/terminal/API"
 import { useThreadEventRouter, type TerminalEvent } from "@/lib/thread-events"
 
 type TerminalListenerEvent =
@@ -53,7 +48,7 @@ export function useThreadTerminal(threadId?: number): UseThreadTerminalResponse 
     setExitStatus(null)
     setError(null)
     try {
-      await StartThreadTerminal(currentThreadId)
+      await Start(currentThreadId)
       if (activeThreadRef.current === currentThreadId) {
         setStatus("ready")
         broadcast({ type: "ready" })
@@ -73,7 +68,7 @@ export function useThreadTerminal(threadId?: number): UseThreadTerminalResponse 
       return
     }
     try {
-      await StopThreadTerminal(threadId)
+      await Stop(threadId)
     } catch (err) {
       console.error("Failed to stop terminal", err)
     }
@@ -85,7 +80,7 @@ export function useThreadTerminal(threadId?: number): UseThreadTerminalResponse 
         return
       }
       try {
-        await WriteThreadTerminal(threadId, data)
+        await Write(threadId, data)
       } catch (err) {
         if (status !== "error") {
           const message = err instanceof Error ? err.message : "Failed to write to terminal"
@@ -102,7 +97,7 @@ export function useThreadTerminal(threadId?: number): UseThreadTerminalResponse 
       return
     }
     try {
-      await ResizeThreadTerminal(threadId, cols, rows)
+      await Resize(threadId, cols, rows)
     } catch (err) {
       console.error("Failed to resize terminal", err)
     }
@@ -143,7 +138,7 @@ export function useThreadTerminal(threadId?: number): UseThreadTerminalResponse 
     void start()
     return () => {
       unsubscribe()
-      void StopThreadTerminal(threadId)
+      void Stop(threadId)
     }
   }, [broadcast, router, start, threadId])
 
