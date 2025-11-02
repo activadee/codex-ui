@@ -33,8 +33,7 @@ func (s *Service) prepareThread(ctx context.Context, req *MessageRequest) (disco
         if strings.TrimSpace(req.ThreadOptions.Model) != "" && (
             req.ThreadOptions.Model != thread.Model ||
             req.ThreadOptions.SandboxMode != thread.SandboxMode ||
-            req.ThreadOptions.ReasoningLevel != thread.ReasoningLevel,
-        ) {
+            req.ThreadOptions.ReasoningLevel != thread.ReasoningLevel) {
             if uerr := s.repo.UpdateThreadOptions(ctx, thread.ID,
                 req.ThreadOptions.Model,
                 req.ThreadOptions.SandboxMode,
