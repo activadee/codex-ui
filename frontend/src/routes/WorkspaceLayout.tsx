@@ -1,4 +1,4 @@
-import { useCallback, useMemo } from "react"
+import { useCallback, useEffect, useMemo } from "react"
 import { Outlet, useNavigate } from "react-router-dom"
 
 import { WorkspaceShell } from "@/components/app/workspace-shell"
@@ -166,6 +166,33 @@ export default function WorkspaceLayout() {
     sandboxOptions: composer.sandboxOptions,
     sendPrompt: handleSendPrompt
   }
+
+  // Sync composer selections to the active thread's saved options
+  useEffect(() => {
+    const thread = workspace.selection.thread
+    if (!thread) return
+    if (thread.model && thread.model !== composer.model.value) {
+      composer.setModelValue(thread.model)
+    }
+    if (thread.sandboxMode && thread.sandboxMode !== composer.sandbox.value) {
+      composer.setSandboxValue(thread.sandboxMode)
+    }
+  }, [
+    workspace.selection.thread?.id,
+    workspace.selection.thread?.model,
+    workspace.selection.thread?.sandboxMode,
+    composer.setModelValue,
+    composer.setSandboxValue
+  ])
+
+  useEffect(() => {
+    const thread = workspace.selection.thread
+    if (!thread || !thread.reasoningLevel) return
+    if (thread.model && thread.model !== composer.model.value) {
+      return
+    }
+    composer.setReasoningValue(thread.reasoningLevel)
+  }, [workspace.selection.thread?.id, workspace.selection.thread?.reasoningLevel, composer.model.value, composer.setReasoningValue])
 
   return (
     <>

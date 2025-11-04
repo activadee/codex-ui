@@ -214,6 +214,29 @@ func (r *Repository) UpdateThreadTitle(ctx context.Context, id int64, title stri
 	return nil
 }
 
+// UpdateThreadOptions updates model, sandbox_mode, and reasoning_level for a thread.
+func (r *Repository) UpdateThreadOptions(ctx context.Context, id int64, model, sandboxMode, reasoningLevel string) error {
+	res, err := r.db.ExecContext(ctx, `
+        UPDATE threads
+        SET model = ?,
+            sandbox_mode = ?,
+            reasoning_level = ?,
+            updated_at = CURRENT_TIMESTAMP
+        WHERE id = ?
+    `, model, sandboxMode, reasoningLevel, id)
+	if err != nil {
+		return fmt.Errorf("update thread options: %w", err)
+	}
+	rows, rowsErr := res.RowsAffected()
+	if rowsErr != nil {
+		return fmt.Errorf("update thread options rows affected: %w", rowsErr)
+	}
+	if rows == 0 {
+		return sql.ErrNoRows
+	}
+	return nil
+}
+
 // UpdateThreadExternalID stores the remote identifier for a thread.
 func (r *Repository) UpdateThreadExternalID(ctx context.Context, id int64, externalID string) error {
 	_, err := r.db.ExecContext(ctx, `
