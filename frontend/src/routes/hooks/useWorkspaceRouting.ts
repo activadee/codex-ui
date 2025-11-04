@@ -45,27 +45,33 @@ export function useWorkspaceRouting(
         }
         return
       }
-      if (workspace.projects.list.length > 0) {
+      if (workspace.projects.list.length > 0 && location.pathname !== "/") {
         navigate("/", { replace: true })
       }
       return
     }
     if (workspace.projects.active) {
-      navigate(`/projects/${workspace.projects.active.id}`, { replace: true })
+      const target = `/projects/${workspace.projects.active.id}`
+      if (location.pathname !== target) {
+        navigate(target, { replace: true })
+      }
       return
     }
     if (workspace.projects.list.length > 0) {
       const first = workspace.projects.list[0]
       void workspace.projects.select(first)
-      navigate(`/projects/${first.id}`, { replace: true })
+      const target = `/projects/${first.id}`
+      if (location.pathname !== target) {
+        navigate(target, { replace: true })
+      }
     }
   }, [
     navigate,
     projectIdParam,
-    workspace.projects.active,
+    location.pathname,
+    workspace.projects.active?.id,
     workspace.projects.isLoading,
-    workspace.projects.list,
-    workspace.projects
+    workspace.projects.list
   ])
 
   useEffect(() => {
@@ -94,19 +100,27 @@ export function useWorkspaceRouting(
       return
     }
 
-    if (workspace.threads.active && workspace.threads.active.projectId === activeProject.id) {
-      navigate(`/projects/${activeProject.id}/threads/${workspace.threads.active.id}`, { replace: true })
+    // Only drive thread navigation when URL's project matches active project.
+    if (
+      (projectIdParam === null || projectIdParam === activeProject.id) &&
+      workspace.threads.active &&
+      workspace.threads.active.projectId === activeProject.id
+    ) {
+      const target = `/projects/${activeProject.id}/threads/${workspace.threads.active.id}`
+      if (location.pathname !== target) {
+        navigate(target, { replace: true })
+      }
     }
   }, [
     isNewThreadRoute,
     navigate,
     threadIdParam,
-    workspace.projects.active,
+    location.pathname,
+    workspace.projects.active?.id,
     workspace.projects.isLoading,
-    workspace.threads.active,
+    workspace.threads.active?.id,
     workspace.threads.isLoading,
-    workspace.threads.list,
-    workspace.threads
+    workspace.threads.list
   ])
 
   useEffect(() => {

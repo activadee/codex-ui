@@ -9,7 +9,6 @@ export type ProjectSidebarProps = {
   projects: Project[]
   sections: ThreadSection[]
   activeProject: Project | null
-  onProjectChange: (project: Project) => void
   onProjectDelete: (project: Project) => void
   onAddProject: () => void
   onNewThread: () => void
@@ -24,7 +23,6 @@ export function ProjectSidebar({
   projects,
   sections,
   activeProject,
-  onProjectChange,
   onProjectDelete,
   onAddProject,
   onNewThread,
@@ -59,7 +57,6 @@ export function ProjectSidebar({
         <ProjectList
           projects={projects}
           activeProject={activeProject}
-          onSelect={onProjectChange}
           onDelete={onProjectDelete}
         />
         {activeProject && totalThreads >= 0 && (

@@ -24,14 +24,8 @@ export default function WorkspaceLayout() {
 
   const routing = useWorkspaceRouting(workspace, resetComposer)
 
-  const handleProjectChange = useCallback(
-    (project: Project) => {
-      resetComposer()
-      void workspace.projects.select(project)
-      navigate(`/projects/${project.id}`)
-    },
-    [navigate, resetComposer, workspace.projects]
-  )
+  // Project selection now driven by URL (sidebar links) and routing hook.
+  // Keep composer reset on thread/project route changes via routing hook.
 
   const handleRegisterProject = useCallback(
     async (payload: { path: string; displayName?: string; tags: string[] }) => {
@@ -122,7 +116,6 @@ export default function WorkspaceLayout() {
       projects: workspace.projects.list,
       sections: workspace.threads.sections,
       activeProject: workspace.projects.active,
-      onProjectChange: handleProjectChange,
       onProjectDelete: handleDeleteProject,
       onAddProject: dialogs.openDialog,
       onNewThread: handleNewThread,
@@ -136,7 +129,6 @@ export default function WorkspaceLayout() {
       dialogs.openDialog,
       handleDeleteProject,
       handleNewThread,
-      handleProjectChange,
       handleThreadSelect,
       routing.sidebarLoading,
       workspace.projects.active,
