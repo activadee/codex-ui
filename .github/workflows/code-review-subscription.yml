@@ -45,10 +45,18 @@ jobs:
       - name: Load Codex output schema
         run: echo "CODEX_OUTPUT_SCHEMA=$(jq -c . .github/prompts/codex-review-schema.json)" >> "$GITHUB_ENV"
         
-      - name: Install musl runtime for Codex CLI
+      - name: Install musl 1.2.5 runtime
         run: |
-          sudo apt-get update
-          sudo apt-get install -y musl
+          set -euxo pipefail
+          curl -sSfL https://musl.libc.org/releases/musl-1.2.5.tar.gz -o musl.tar.gz
+          tar -xzf musl.tar.gz
+          pushd musl-1.2.5
+          ./configure --prefix=/opt/musl-1.2.5
+          make -j"$(nproc)"
+          sudo make install
+          popd
+          sudo ln -sf /opt/musl-1.2.5/lib/ld-musl-x86_64.so.1 /lib/ld-musl-x86_64.so.1
+      
       - name: Run Codex review
         id: run_codex
         uses: activadee/codex-action@main
