@@ -178,9 +178,9 @@ export default function WorkspaceLayout() {
       composer.setSandboxValue(thread.sandboxMode)
     }
   }, [
-    workspace.selection.thread,
-    composer.model.value,
-    composer.sandbox.value,
+    workspace.selection.thread?.id,
+    workspace.selection.thread?.model,
+    workspace.selection.thread?.sandboxMode,
     composer.setModelValue,
     composer.setSandboxValue
   ])
