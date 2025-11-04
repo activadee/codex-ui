@@ -29,9 +29,22 @@ func (a *API) SaveClipboardImage(dataBase64 string, mimeType string) (string, er
     if err != nil { return "", fmt.Errorf("decode image data: %w", err) }
     if len(bytes) == 0 { return "", fmt.Errorf("image data is empty") }
     ext := ".png"
-    if candidates, err := mime.ExtensionsByType(mediaType); err == nil {
-        for _, c := range candidates { if c!="" { ext = c; break } }
-    } else if strings.Contains(mediaType, "jpeg") { ext = ".jpg" }
+    if candidates, err := mime.ExtensionsByType(mediaType); err == nil && len(candidates) > 0 {
+        for _, c := range candidates { if c != "" { ext = c; break } }
+    } else {
+        switch {
+        case strings.Contains(mediaType, "jpeg"):
+            ext = ".jpg"
+        case strings.Contains(mediaType, "gif"):
+            ext = ".gif"
+        case strings.Contains(mediaType, "webp"):
+            ext = ".webp"
+        case strings.Contains(mediaType, "bmp"):
+            ext = ".bmp"
+        case strings.Contains(mediaType, "svg"):
+            ext = ".svg"
+        }
+    }
     dir, err := a.attachmentsDir(); if err != nil { return "", err }
     if err := os.MkdirAll(dir, 0o755); err != nil { return "", fmt.Errorf("create attachments directory: %w", err) }
     filename := uuid.NewString() + ext
