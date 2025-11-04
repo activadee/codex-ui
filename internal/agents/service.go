@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"sync"
@@ -617,9 +618,9 @@ func (s *Service) cleanupOrphanWorktrees(ctx context.Context) error {
 			if !td.IsDir() {
 				continue
 			}
-			// parse numeric id
-			id, perr := strconv.ParseInt(td.Name(), 10, 64)
-			if perr != nil || id <= 0 {
+			// parse id from either numeric-only or slugged (e.g. "feature-x-123") names
+			id, ok := parseThreadIDFromDir(td.Name())
+			if !ok || id <= 0 {
 				continue
 			}
 			if s.isThreadActive(id) {
@@ -635,4 +636,24 @@ func (s *Service) cleanupOrphanWorktrees(ctx context.Context) error {
 		}
 	}
 	return nil
+}
+
+var trailingDigits = regexp.MustCompile(`(\d+)$`)
+
+// parseThreadIDFromDir extracts the numeric thread ID from a directory name.
+// Accepts both "123" and slugged names ending with "-<id>".
+func parseThreadIDFromDir(name string) (int64, bool) {
+	trimmed := strings.TrimSpace(name)
+	if trimmed == "" {
+		return 0, false
+	}
+	if id, err := strconv.ParseInt(trimmed, 10, 64); err == nil {
+		return id, true
+	}
+	if m := trailingDigits.FindStringSubmatch(trimmed); len(m) == 2 {
+		if id, err := strconv.ParseInt(m[1], 10, 64); err == nil {
+			return id, true
+		}
+	}
+	return 0, false
 }
