@@ -7,7 +7,6 @@ type SidebarProps = {
   projects: Project[]
   sections: ThreadSection[]
   activeProject: Project | null
-  onProjectChange: (project: Project) => void
   onProjectDelete: (project: Project) => void
   onAddProject: () => void
   onNewThread: () => void
@@ -31,7 +30,6 @@ export function WorkspaceShell({ sidebar, main, footer }: WorkspaceShellProps) {
         projects={sidebar.projects}
         sections={sidebar.sections}
         activeProject={sidebar.activeProject}
-        onProjectChange={sidebar.onProjectChange}
         onProjectDelete={sidebar.onProjectDelete}
         onAddProject={sidebar.onAddProject}
         isLoadingProjects={sidebar.isLoadingProjects}

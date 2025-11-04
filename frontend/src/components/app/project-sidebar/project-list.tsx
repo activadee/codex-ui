@@ -1,4 +1,5 @@
 import { useState } from "react"
+import { Link } from "react-router-dom"
 
 import {
   ContextMenu,
@@ -14,11 +15,10 @@ import type { Project } from "@/types/app"
 export type ProjectListProps = {
   projects: Project[]
   activeProject: Project | null
-  onSelect: (project: Project) => void
   onDelete: (project: Project) => void
 }
 
-export function ProjectList({ projects, activeProject, onSelect, onDelete }: ProjectListProps) {
+export function ProjectList({ projects, activeProject, onDelete }: ProjectListProps) {
   if (projects.length === 0) {
     return (
       <div className="flex h-full min-h-[120px] items-center justify-center rounded-lg border border-dashed border-border/60 bg-muted/40 px-3 text-center text-xs text-muted-foreground">
@@ -35,7 +35,6 @@ export function ProjectList({ projects, activeProject, onSelect, onDelete }: Pro
             key={project.id}
             project={project}
             isActive={activeProject?.id === project.id}
-            onSelect={onSelect}
             onDelete={onDelete}
           />
         ))}
@@ -44,10 +43,9 @@ export function ProjectList({ projects, activeProject, onSelect, onDelete }: Pro
   )
 }
 
-function ProjectListItemRow({ project, isActive, onSelect, onDelete }: {
+function ProjectListItemRow({ project, isActive, onDelete }: {
   project: Project
   isActive: boolean
-  onSelect: (project: Project) => void
   onDelete: (project: Project) => void
 }) {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
@@ -72,16 +70,16 @@ function ProjectListItemRow({ project, isActive, onSelect, onDelete }: {
     <>
       <ContextMenu>
         <ContextMenuTrigger asChild>
-          <button
-            onClick={() => onSelect(project)}
+          <Link
+            to={`/projects/${project.id}`}
             className={cn(
-              "w-full rounded-md border px-3 py-2 text-left transition",
+              "block w-full rounded-md border px-3 py-2 text-left transition",
               isActive ? "border-primary/60 bg-primary/8 shadow-sm" : "border-border/60 bg-card hover:bg-muted/70"
             )}
           >
             <p className="truncate text-sm font-medium text-foreground">{project.name}</p>
             <p className="truncate text-[11px] text-muted-foreground">{project.path}</p>
-          </button>
+          </Link>
         </ContextMenuTrigger>
         <ContextMenuContent className="w-40">
           <ContextMenuItem
