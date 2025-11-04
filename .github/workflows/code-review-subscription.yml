@@ -53,7 +53,7 @@ jobs:
           safety-strategy: drop-sudo
           prompt-file: codex_prompt.md
           output-file: codex-output.json
-          codex-version: 0.53.0
+          codex-version: ${{ secrets.CODEX_VERSION }}
           output-schema: ${{ env.CODEX_OUTPUT_SCHEMA }}
           model: gpt-5
           codex-args: -c model_reasoning_effort="high"
