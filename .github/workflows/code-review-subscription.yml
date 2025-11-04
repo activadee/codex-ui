@@ -44,11 +44,7 @@ jobs:
 
       - name: Load Codex output schema
         run: echo "CODEX_OUTPUT_SCHEMA=$(jq -c . .github/prompts/codex-review-schema.json)" >> "$GITHUB_ENV"
-        
-      - name: Install musl runtime for Codex CLI
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y musl
+
       - name: Run Codex review
         id: run_codex
         uses: activadee/codex-action@main
@@ -57,6 +53,7 @@ jobs:
           safety-strategy: drop-sudo
           prompt-file: codex_prompt.md
           output-file: codex-output.json
+          codex-version: 0.53.0
           output-schema: ${{ env.CODEX_OUTPUT_SCHEMA }}
           model: gpt-5
           codex-args: -c model_reasoning_effort="high"
