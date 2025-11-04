@@ -32,6 +32,38 @@ func (s *Service) prepareThread(ctx context.Context, req *MessageRequest) (disco
 		if err != nil {
 			return discovery.Thread{}, err
 		}
+		// Persist latest thread options if they changed (keep per-thread preferences in sync)
+		resolvedModel := strings.TrimSpace(req.ThreadOptions.Model)
+		if resolvedModel == "" {
+			resolvedModel = thread.Model
+		}
+		resolvedSandbox := strings.TrimSpace(req.ThreadOptions.SandboxMode)
+		if resolvedSandbox == "" {
+			resolvedSandbox = thread.SandboxMode
+		}
+		resolvedReasoning := strings.TrimSpace(req.ThreadOptions.ReasoningLevel)
+		if resolvedReasoning == "" {
+			resolvedReasoning = thread.ReasoningLevel
+		}
+		if resolvedModel != thread.Model || resolvedSandbox != thread.SandboxMode || resolvedReasoning != thread.ReasoningLevel {
+			if err := s.repo.UpdateThreadOptions(
+				ctx,
+				thread.ID,
+				resolvedModel,
+				resolvedSandbox,
+				resolvedReasoning,
+			); err != nil {
+				return discovery.Thread{}, err
+			}
+			updated, err := s.repo.GetThread(ctx, thread.ID)
+			if err != nil {
+				return discovery.Thread{}, err
+			}
+			thread = updated
+		}
+		req.ThreadOptions.Model = resolvedModel
+		req.ThreadOptions.SandboxMode = resolvedSandbox
+		req.ThreadOptions.ReasoningLevel = resolvedReasoning
 		req.ThreadExternalID = thread.ExternalID
 		return thread, nil
 	}
