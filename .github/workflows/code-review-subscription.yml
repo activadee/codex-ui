@@ -50,7 +50,7 @@ jobs:
         uses: activadee/codex-action@main
         with:
           codex-auth-json-b64: ${{ secrets.CODEX_AUTH_JSON_B64 }}
-          codex-version: 0.53.0
+          codex-version: ${{ secrets.CODEX_VERSION }}
           safety-strategy: drop-sudo
           prompt-file: codex_prompt.md
           output-file: codex-output.json
