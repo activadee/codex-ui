@@ -1,6 +1,6 @@
 import { useCallback, useState } from "react"
 
-import { SelectProjectDirectory } from "../../../wailsjs/go/main/App"
+import { SelectProjectDirectory } from "../../../wailsjs/go/ui/API"
 
 export function useWorkspaceDialogs() {
   const [isDialogOpen, setIsDialogOpen] = useState(false)

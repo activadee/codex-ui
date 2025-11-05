@@ -27,7 +27,7 @@ Provide the desktop UI with a reliable list of Codex workspaces/projects, includ
    - Unit tests using in-memory SQLite (modernc supports `file::memory:?cache=shared`).
 
 3. **Wails Backend Bindings**
-   - New service layer (e.g., `internal/services/projects`) that:
+   - New service layer (e.g., `internal/projects`) that:
      - wraps repository calls
      - handles domain validation (unique path, deriving display name, etc.)
    - Expose Wails methods:
@@ -63,4 +63,3 @@ Provide the desktop UI with a reliable list of Codex workspaces/projects, includ
 4. Wire service + Wails bindings.
 5. (Optional) Session log scanner + background updater.
 6. Update frontend to consume new backend API.
-

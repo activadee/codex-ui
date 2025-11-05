@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react"
 
-import { DeleteAttachment, SaveClipboardImage } from "../../../wailsjs/go/main/App"
+import { DeleteAttachment, SaveClipboardImage } from "../../../wailsjs/go/attachments/API"
 import type { ImageAttachment } from "@/types/app"
 
 function createAttachmentId(): string {

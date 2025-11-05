@@ -1,7 +1,7 @@
 import { useCallback, useMemo } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 
-import { GetThread, ListThreads } from "../../wailsjs/go/main/App"
+import { GetThread, ListThreads } from "../../wailsjs/go/agents/API"
 import { mapThreadDtoToThread } from "@/lib/threads"
 import type { AgentThread } from "@/types/app"
 

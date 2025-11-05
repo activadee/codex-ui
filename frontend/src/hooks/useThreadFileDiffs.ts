@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react"
 
-import { ListThreadFileDiffs } from "../../wailsjs/go/main/App"
+import { ListThreadFileDiffs } from "../../wailsjs/go/agents/API"
 import { useThreadEventRouter, type FileDiffEvent } from "@/lib/thread-events"
 import type { FileDiffStat } from "@/types/app"
 

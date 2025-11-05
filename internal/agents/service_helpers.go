@@ -9,8 +9,8 @@ import (
 	"strings"
 	"time"
 
+	"codex-ui/internal/git/worktrees"
 	"codex-ui/internal/storage/discovery"
-	"codex-ui/internal/worktrees"
 )
 
 var errRepositoryUnavailable = errors.New("agent repository not initialised")

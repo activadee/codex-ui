@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 
-import { CancelAgentStream, SendAgentMessage } from "../../wailsjs/go/main/App"
+import { Cancel, Send } from "../../wailsjs/go/agents/API"
 import { agents } from "../../wailsjs/go/models"
 import { useThreadEventRouter } from "@/lib/thread-events"
 import type { AgentUsage, StreamEventPayload } from "@/types/app"
@@ -91,7 +91,7 @@ export function useAgentStream(options: UseAgentStreamOptions = {}) {
         throw new Error("That thread already has an active stream")
       }
 
-      const handle = await SendAgentMessage(payload)
+      const handle = await Send(payload)
       router.registerStream(handle)
       updateThreadState(handle.threadId, () => ({
         streamId: handle.streamId,
@@ -125,7 +125,7 @@ export function useAgentStream(options: UseAgentStreamOptions = {}) {
         return
       }
       try {
-        const response = await CancelAgentStream(streamId)
+        const response = await Cancel(streamId)
         router.unregisterStream(streamId)
         updateThreadState(targetThreadId, (prev) => ({
           ...prev,

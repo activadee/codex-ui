@@ -442,23 +442,6 @@ export namespace agents {
 
 }
 
-export namespace main {
-	
-	export class TerminalHandle {
-	    threadId: number;
-	
-	    static createFrom(source: any = {}) {
-	        return new TerminalHandle(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.threadId = source["threadId"];
-	    }
-	}
-
-}
-
 export namespace projects {
 	
 	export class ProjectDTO {
@@ -499,6 +482,23 @@ export namespace projects {
 	        this.path = source["path"];
 	        this.displayName = source["displayName"];
 	        this.tags = source["tags"];
+	    }
+	}
+
+}
+
+export namespace terminal {
+	
+	export class Handle {
+	    threadId: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new Handle(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.threadId = source["threadId"];
 	    }
 	}
 

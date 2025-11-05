@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import { useThreadFileDiffs } from "@/hooks/useThreadFileDiffs"
 import { BrowserOpenURL } from "../../../wailsjs/runtime/runtime"
-import { CreatePullRequest, GetThread } from "../../../wailsjs/go/main/App"
+import { CreatePullRequest, GetThread } from "../../../wailsjs/go/agents/API"
 import { agents } from "../../../wailsjs/go/models"
 
 type FilesPanelProps = {

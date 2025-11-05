@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 
-import { DeleteProject, ListProjects, MarkProjectOpened, RegisterProject } from "../../wailsjs/go/main/App"
+import { DeleteProject, ListProjects, MarkProjectOpened, RegisterProject } from "../../wailsjs/go/projects/API"
 import { mapProjectDtoToProject } from "@/lib/projects"
 import type { Project } from "@/types/app"
 

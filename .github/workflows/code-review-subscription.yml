@@ -44,19 +44,19 @@ jobs:
 
       - name: Load Codex output schema
         run: echo "CODEX_OUTPUT_SCHEMA=$(jq -c . .github/prompts/codex-review-schema.json)" >> "$GITHUB_ENV"
-
+      
       - name: Run Codex review
         id: run_codex
         uses: activadee/codex-action@main
         with:
           codex-auth-json-b64: ${{ secrets.CODEX_AUTH_JSON_B64 }}
+          codex-version: ${{ secrets.CODEX_VERSION }}
           safety-strategy: drop-sudo
           prompt-file: codex_prompt.md
           output-file: codex-output.json
-          codex-version: ${{ secrets.CODEX_VERSION }}
           output-schema: ${{ env.CODEX_OUTPUT_SCHEMA }}
           model: gpt-5
-          codex-args: -c model_reasoning_effort="high"
+          effort: high
 
       - name: Normalize Codex review output
         run: node .github/scripts/codex/normalize-review.cjs
