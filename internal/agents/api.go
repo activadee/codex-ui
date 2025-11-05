@@ -126,7 +126,7 @@ func (a *API) CreatePullRequest(threadID int64) (string, error) {
 		return "", fmt.Errorf("no file changes detected")
 	}
 	instruction := buildCreatePRInstruction(thread.BranchName)
-	stream, err := a.startBackgroundPRStream(worktree, thread.SandboxMode, instruction)
+	stream, err := a.startBackgroundPRStream(worktree, "danger-full-access", instruction)
 	if err != nil {
 		return "", err
 	}
