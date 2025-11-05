@@ -32,6 +32,10 @@ func (a *API) Send(req MessageRequest) (StreamHandle, error) {
 	if a.ctxFn == nil {
 		return StreamHandle{}, fmt.Errorf("application context not initialised")
 	}
+	ctx := a.ctxFn()
+	if ctx == nil {
+		return StreamHandle{}, fmt.Errorf("application context not initialised")
+	}
 	stream, thread, err := a.svc.Send(context.Background(), req)
 	if err != nil {
 		return StreamHandle{}, err
@@ -41,7 +45,6 @@ func (a *API) Send(req MessageRequest) (StreamHandle, error) {
 	}
 	go a.emitDiff(thread.ID)
 	topic := StreamTopic(stream.ID())
-	ctx := a.ctxFn()
 	go func() {
 		defer stream.Close()
 		for event := range stream.Events() {
@@ -164,7 +167,11 @@ func (a *API) emitDiff(threadID int64) {
 		ThreadID int64             `json:"threadId"`
 		Files    []FileDiffStatDTO `json:"files"`
 	}{ThreadID: threadID, Files: stats}
-	wailsruntime.EventsEmit(a.ctxFn(), FileChangeTopic(threadID), payload)
+	ctx := a.ctxFn()
+	if ctx == nil {
+		return
+	}
+	wailsruntime.EventsEmit(ctx, FileChangeTopic(threadID), payload)
 }
 
 // EmitThreadDiffUpdate recomputes and emits file diff update for a thread.
