@@ -1,27 +1,30 @@
 package agents
 
 import (
-	"context"
-	"fmt"
-	"strings"
-	"time"
+    "context"
+    "fmt"
+    "strings"
 
-	"codex-ui/internal/storage/discovery"
-	"codex-ui/internal/watchers"
+    "codex-ui/internal/git/worktrees"
+    "codex-ui/internal/storage/discovery"
+    "codex-ui/internal/watchers"
+    "codex-ui/internal/logging"
 
 	wailsruntime "github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
 // API exposes agent operations to the frontend and emits runtime events.
 type API struct {
-	svc   *Service
-	repo  *discovery.Repository
-	watch *watchers.Service
-	ctxFn func() context.Context
+    svc   *Service
+    repo  *discovery.Repository
+    watch *watchers.Service
+    ctxFn func() context.Context
+    log   logging.Logger
 }
 
-func NewAPI(svc *Service, repo *discovery.Repository, watch *watchers.Service, ctxProvider func() context.Context) *API {
-	return &API{svc: svc, repo: repo, watch: watch, ctxFn: ctxProvider}
+func NewAPI(svc *Service, repo *discovery.Repository, watch *watchers.Service, ctxProvider func() context.Context, logger logging.Logger) *API {
+    if logger == nil { logger = logging.Nop() }
+    return &API{svc: svc, repo: repo, watch: watch, ctxFn: ctxProvider, log: logger}
 }
 
 // Send streams a prompt through the configured agent and emits runtime events.
@@ -118,15 +121,22 @@ func (a *API) CreatePullRequest(threadID int64) (string, error) {
 	if worktree == "" {
 		return "", fmt.Errorf("thread %d has no worktree", threadID)
 	}
-	diffs, err := a.svc.ListThreadDiffStats(context.Background(), threadID)
-	if err != nil {
-		return "", err
-	}
-	if len(diffs) == 0 {
-		return "", fmt.Errorf("no file changes detected")
-	}
-	instruction := buildCreatePRInstruction(thread.BranchName)
-	stream, err := a.startBackgroundPRStream(worktree, "danger-full-access", instruction)
+    diffs, err := a.svc.ListThreadDiffStats(context.Background(), threadID)
+    if err != nil {
+        return "", err
+    }
+    if len(diffs) == 0 {
+        return "", fmt.Errorf("no file changes detected")
+    }
+    // Resolve branch name with fallback and persist if missing
+    branch := strings.TrimSpace(thread.BranchName)
+    if branch == "" {
+        branch = worktrees.BranchName(thread.Title, thread.ID)
+        // best-effort persist before running the PR job
+        _ = a.repo.UpdateThreadBranchName(context.Background(), thread.ID, branch)
+    }
+    instruction := BuildCreatePRInstruction(branch)
+    stream, err := StartBackgroundPRStream(worktree, "danger-full-access", instruction)
 	if err != nil {
 		return "", err
 	}
@@ -159,10 +169,10 @@ func (a *API) emitDiff(threadID int64) {
 		return
 	}
 	stats, err := a.svc.ListThreadDiffStats(context.Background(), threadID)
-	if err != nil {
-		fmt.Printf("list thread diff stats %d: %v\n", threadID, err)
-		return
-	}
+    if err != nil {
+        if a.log != nil { a.log.Warn("list thread diff stats failed", "threadID", threadID, "error", err) }
+        return
+    }
 	payload := struct {
 		ThreadID int64             `json:"threadId"`
 		Files    []FileDiffStatDTO `json:"files"`
@@ -177,62 +187,4 @@ func (a *API) emitDiff(threadID int64) {
 // EmitThreadDiffUpdate recomputes and emits file diff update for a thread.
 func (a *API) EmitThreadDiffUpdate(threadID int64) { a.emitDiff(threadID) }
 
-func buildCreatePRInstruction(branchName string) string {
-	return fmt.Sprintf(`You are operating in a git worktree branch for this thread.
-Task:
-1) Review all staged and unstaged changes.
-2) Group logically and create conventional commits (feat|fix|chore|refactor|docs|test) with meaningful scope and messages.
-3) Push the branch '%s' to origin and ensure upstream is set.
-4) Create or update a GitHub pull request from this branch against the default base branch.
-   - Use a conventional title.
-   - Write a clear, structured description that summarizes the changes.
-
-Constraints:
-- Prefer the GitHub CLI (gh). If a PR already exists for the branch, update it.
-- Do not print secrets or token values.
-
-Output:
-- After completion print exactly one line with: PR_URL: https://github.com/<owner>/<repo>/pull/<number>
-- Do not include any other lines after the PR_URL line.`, branchName)
-}
-
-type prStream struct {
-	Events <-chan StreamEvent
-	Done   <-chan error
-	Close  func() error
-}
-
-func (a *API) startBackgroundPRStream(worktree, sandboxMode, instruction string) (*prStream, error) {
-	adapter, err := NewCodexAdapter(CodexOptionsFromEnv())
-	if err != nil {
-		return nil, fmt.Errorf("initialise codex adapter: %w", err)
-	}
-	sandbox := strings.TrimSpace(sandboxMode)
-	if sandbox == "" {
-		sandbox = "workspace-write"
-	}
-	req := MessageRequest{
-		ThreadOptions: ThreadOptionsDTO{
-			Model:            "gpt-5",
-			SandboxMode:      sandbox,
-			ReasoningLevel:   "minimal",
-			WorkingDirectory: worktree,
-			SkipGitRepoCheck: false,
-		},
-		Input: instruction,
-	}
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
-	res, err := adapter.Stream(ctx, req)
-	if err != nil {
-		cancel()
-		return nil, err
-	}
-	wrappedClose := func() error {
-		cancel()
-		if res.Close != nil {
-			return res.Close()
-		}
-		return nil
-	}
-	return &prStream{Events: res.Events, Done: res.Done, Close: wrappedClose}, nil
-}
+// pr stream type moved to prs.go

@@ -1,11 +1,11 @@
 package terminal
 
 import (
-	"context"
-	"encoding/base64"
-	"errors"
-	"fmt"
-	"io"
+    "context"
+    "encoding/base64"
+    "errors"
+    "fmt"
+    "io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -14,18 +14,25 @@ import (
 	"sync"
 	"syscall"
 
-	"codex-ui/internal/agents"
+    "codex-ui/internal/agents"
+    "codex-ui/internal/logging"
 
 	"github.com/creack/pty"
 	wailsruntime "github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
+const (
+    eventReady  = "ready"
+    eventExit   = "exit"
+    eventOutput = "output"
+)
 type Manager struct {
-	agent *agents.Service
-	ctxFn func() context.Context
-	mu    sync.Mutex
-	terms map[int64]*session
-	shell string
+    agent *agents.Service
+    ctxFn func() context.Context
+    mu    sync.Mutex
+    terms map[int64]*session
+    shell string
+    logger logging.Logger
 }
 
 type session struct {
@@ -36,11 +43,14 @@ type session struct {
 	done     chan struct{}
 }
 
-func NewManager(agent *agents.Service, ctxProvider func() context.Context, shellPath string) *Manager {
-	if strings.TrimSpace(shellPath) == "" {
-		shellPath = detectShell()
-	}
-	return &Manager{agent: agent, ctxFn: ctxProvider, terms: map[int64]*session{}, shell: shellPath}
+func NewManager(agent *agents.Service, ctxProvider func() context.Context, shellPath string, logger logging.Logger) *Manager {
+    if strings.TrimSpace(shellPath) == "" {
+        shellPath = detectShell()
+    }
+    if logger == nil {
+        logger = logging.Nop()
+    }
+    return &Manager{agent: agent, ctxFn: ctxProvider, terms: map[int64]*session{}, shell: shellPath, logger: logger}
 }
 
 func (m *Manager) Start(threadID int64) error {
@@ -182,30 +192,30 @@ func (m *Manager) forward(s *session) {
 			m.emitOutput(s.threadID, chunk)
 		}
 		if err != nil {
-			if !errors.Is(err, os.ErrClosed) && !errors.Is(err, io.EOF) {
-				var errno syscall.Errno
-				if !(runtime.GOOS != "windows" && errors.As(err, &errno) && errno == syscall.Errno(5)) {
-					fmt.Printf("terminal read thread %d: %v\n", s.threadID, err)
-				}
-			}
-			return
-		}
-	}
+            if !errors.Is(err, os.ErrClosed) && !errors.Is(err, io.EOF) {
+                var errno syscall.Errno
+                if !(runtime.GOOS != "windows" && errors.As(err, &errno) && errno == syscall.Errno(5)) {
+                    if m.logger != nil { m.logger.Warn("terminal read error", "threadID", s.threadID, "error", err) }
+                }
+            }
+            return
+        }
+    }
 }
 
-func (m *Manager) emitReady(threadID int64) { m.emitEvent(threadID, "ready", "", "") }
+func (m *Manager) emitReady(threadID int64) { m.emitEvent(threadID, eventReady, "", "") }
 func (m *Manager) emitExit(threadID int64, status string) {
-	if status == "" {
-		status = "exited"
-	}
-	m.emitEvent(threadID, "exit", "", status)
+    if status == "" {
+        status = "exited"
+    }
+    m.emitEvent(threadID, eventExit, "", status)
 }
 func (m *Manager) emitOutput(threadID int64, data []byte) {
-	if len(data) == 0 {
-		return
-	}
-	enc := base64.StdEncoding.EncodeToString(data)
-	m.emitEvent(threadID, "output", enc, "")
+    if len(data) == 0 {
+        return
+    }
+    enc := base64.StdEncoding.EncodeToString(data)
+    m.emitEvent(threadID, eventOutput, enc, "")
 }
 func (m *Manager) emitEvent(threadID int64, typ, data, status string) {
 	if m.ctxFn == nil {

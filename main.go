@@ -1,15 +1,16 @@
 package main
 
 import (
-	"context"
-	"embed"
-	"log"
-	"path/filepath"
+    "context"
+    "embed"
+    "log"
+    "path/filepath"
+    "log/slog"
 
-	"github.com/wailsapp/wails/v2"
-	"github.com/wailsapp/wails/v2/pkg/options"
-	"github.com/wailsapp/wails/v2/pkg/options/assetserver"
-	"github.com/wailsapp/wails/v2/pkg/options/linux"
+    "github.com/wailsapp/wails/v2"
+    "github.com/wailsapp/wails/v2/pkg/options"
+    "github.com/wailsapp/wails/v2/pkg/options/assetserver"
+    "github.com/wailsapp/wails/v2/pkg/options/linux"
 
 	"codex-ui/internal/agents"
 	"codex-ui/internal/attachments"
@@ -18,9 +19,10 @@ import (
 	"codex-ui/internal/storage/discovery"
 	"codex-ui/internal/storage/migrate"
 	"codex-ui/internal/storage/sqlite"
-	term "codex-ui/internal/terminal"
-	"codex-ui/internal/ui"
-	"codex-ui/internal/watchers"
+    term "codex-ui/internal/terminal"
+    "codex-ui/internal/ui"
+    "codex-ui/internal/watchers"
+    "codex-ui/internal/logging"
 )
 
 //go:embed all:frontend/dist
@@ -44,26 +46,29 @@ func main() {
 		log.Fatalf("migrate: %v", err)
 	}
 
-	// Repository & services
-	repo := discovery.NewRepository(db)
-	app.db = db
-	app.repo = repo
-	app.projectService = projects.NewService(repo)
-	agentService, err := agents.BootstrapService(dataDir, repo)
+    // Repository & services
+    repo := discovery.NewRepository(db)
+    app.db = db
+    app.repo = repo
+    // Logger (text slog by default)
+    logger := logging.NewText(nil, slog.LevelInfo)
+    app.projectService = projects.NewService(repo, logger)
+    agentService, err := agents.BootstrapService(dataDir, repo)
 	if err != nil {
 		log.Fatalf("init agent service: %v", err)
 	}
 	app.agentService = agentService
 
-	// Domain APIs
-	projectsAPI := projects.NewAPI(app.projectService)
-	watcherSvc := watchers.New(nil)
-	agentsAPI := agents.NewAPI(app.agentService, repo, watcherSvc, app.Context)
-	watcherSvc.SetEmitter(agentsAPI.EmitThreadDiffUpdate)
-	termMgr := term.NewManager(app.agentService, app.Context, "")
-	termAPI := term.NewAPI(termMgr)
-	attachAPI := attachments.NewAPI()
-	uiAPI := ui.NewAPI(app.Context)
+    // Domain APIs
+    projectsAPI := projects.NewAPI(app.projectService, logger)
+    watcherSvc := watchers.New(nil)
+    watcherSvc.SetLogger(logger)
+    agentsAPI := agents.NewAPI(app.agentService, repo, watcherSvc, app.Context, logger)
+    watcherSvc.SetEmitter(agentsAPI.EmitThreadDiffUpdate)
+    termMgr := term.NewManager(app.agentService, app.Context, "", logger)
+    termAPI := term.NewAPI(termMgr)
+    attachAPI := attachments.NewAPI(logger)
+    uiAPI := ui.NewAPI(app.Context, logger)
 
 	// Create application with options
 	err = wails.Run(&options.App{

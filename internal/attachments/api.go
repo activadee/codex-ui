@@ -9,14 +9,18 @@ import (
     "strings"
 
     "github.com/google/uuid"
+    "codex-ui/internal/logging"
     "codex-ui/internal/storage"
 )
 
 const attachmentsDirName = "attachments"
 
-type API struct{}
+type API struct{ log logging.Logger }
 
-func NewAPI() *API { return &API{} }
+func NewAPI(logger logging.Logger) *API {
+    if logger == nil { logger = logging.Nop() }
+    return &API{log: logger}
+}
 
 // SaveClipboardImage persists a clipboard image to disk and returns the absolute path.
 func (a *API) SaveClipboardImage(dataBase64 string, mimeType string) (string, error) {
@@ -51,6 +55,9 @@ func (a *API) SaveClipboardImage(dataBase64 string, mimeType string) (string, er
     target := filepath.Join(dir, filename)
     if err := os.WriteFile(target, bytes, 0o600); err != nil { return "", fmt.Errorf("write image: %w", err) }
     abs, err := filepath.Abs(target); if err != nil { return "", fmt.Errorf("resolve image path: %w", err) }
+    // Log only relative filename to avoid leaking absolute paths
+    file := filepath.Base(abs)
+    if a.log != nil { a.log.Info("attachment saved", "file", file, "mime", mediaType) }
     return abs, nil
 }
 
@@ -64,6 +71,7 @@ func (a *API) DeleteAttachment(path string) error {
     rel, err := filepath.Rel(rootAbs, target); if err != nil { return fmt.Errorf("resolve relative: %w", err) }
     if rel=="." || rel=="" || rel==".." || strings.HasPrefix(rel, ".."+string(os.PathSeparator)) { return fmt.Errorf("attachment path outside managed directory") }
     if err := os.Remove(target); err != nil { return fmt.Errorf("delete attachment: %w", err) }
+    if a.log != nil { a.log.Info("attachment deleted", "file", filepath.Base(target)) }
     return nil
 }
 
@@ -71,4 +79,3 @@ func (a *API) attachmentsDir() (string, error) {
     root, err := storage.DataDir(); if err != nil { return "", err }
     return filepath.Join(root, attachmentsDirName), nil
 }
-

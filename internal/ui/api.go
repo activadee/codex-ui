@@ -1,15 +1,22 @@
 package ui
 
 import (
-	"context"
-	"fmt"
+    "context"
+    "fmt"
 
-	wailsruntime "github.com/wailsapp/wails/v2/pkg/runtime"
+    "codex-ui/internal/logging"
+    wailsruntime "github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
-type API struct{ ctxFn func() context.Context }
+type API struct{
+    ctxFn func() context.Context
+    log   logging.Logger
+}
 
-func NewAPI(ctxProvider func() context.Context) *API { return &API{ctxFn: ctxProvider} }
+func NewAPI(ctxProvider func() context.Context, logger logging.Logger) *API {
+    if logger == nil { logger = logging.Nop() }
+    return &API{ctxFn: ctxProvider, log: logger}
+}
 
 type OpenDialogOptions struct {
 	Title            string `json:"title"`

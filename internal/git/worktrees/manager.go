@@ -1,30 +1,35 @@
 package worktrees
 
 import (
-	"bytes"
-	"context"
-	"fmt"
-	"os"
-	"os/exec"
-	"path/filepath"
-	"regexp"
-	"strconv"
-	"strings"
+    "bytes"
+    "context"
+    "fmt"
+    "os"
+    "os/exec"
+    "path/filepath"
+    "regexp"
+    "strconv"
+    "strings"
 )
+import gitc "codex-ui/internal/git/client"
 
 // Manager manages per-thread git worktrees under a managed root directory.
 type Manager struct {
-	root   string
-	gitBin string
+    root   string
+    gitBin string
+    git    gitc.Client
 }
 
 // NewManager constructs a Manager. gitBin defaults to "git" when empty.
 func NewManager(root, gitBin string) *Manager {
-	if strings.TrimSpace(gitBin) == "" {
-		gitBin = "git"
-	}
-	return &Manager{root: root, gitBin: gitBin}
+    if strings.TrimSpace(gitBin) == "" {
+        gitBin = "git"
+    }
+    return &Manager{root: root, gitBin: gitBin, git: gitc.NewExecClient(gitBin)}
 }
+
+// SetGitClient overrides the internal git client used for read ops.
+func (m *Manager) SetGitClient(c gitc.Client) { if c != nil { m.git = c } }
 
 // Root returns the managed root path.
 func (m *Manager) Root() string { return m.root }
@@ -37,10 +42,10 @@ func (m *Manager) EnsureForThread(ctx context.Context, projectPath string, threa
 		return "", "", "", fmt.Errorf("project path is required")
 	}
 
-	repoRoot, err := m.gitShowTopLevel(ctx, projectPath)
-	if err != nil {
-		return "", "", "", fmt.Errorf("project not a git repo: %w", err)
-	}
+    repoRoot, err := m.git.RepoRoot(ctx, projectPath)
+    if err != nil {
+        return "", "", "", fmt.Errorf("project not a git repo: %w", err)
+    }
 
 	projectSlug := sanitizeSegment(filepath.Base(projectPath))
 	trimmedHint := strings.TrimSpace(nameHint)
@@ -53,24 +58,24 @@ func (m *Manager) EnsureForThread(ctx context.Context, projectPath string, threa
 	// Back-compat: if using a new suffix but old id-only worktree exists, reuse it
 	if dirSuffix != idSuffix {
 		oldPath := filepath.Join(m.root, projectSlug, idSuffix)
-		if st, err := os.Stat(oldPath); err == nil && st.IsDir() {
-			if m.isGitDir(ctx, oldPath) == nil {
-				worktreePath = oldPath
-			}
-		}
-	}
+        if st, err := os.Stat(oldPath); err == nil && st.IsDir() {
+            if ok, _ := m.git.IsRepoPath(ctx, oldPath); ok {
+                worktreePath = oldPath
+            }
+        }
+    }
 	if err := os.MkdirAll(filepath.Dir(worktreePath), 0o755); err != nil {
 		return "", "", "", fmt.Errorf("ensure worktree parent: %w", err)
 	}
 
 	// If exists and looks valid, reuse; otherwise create/attach
-	if st, err := os.Stat(worktreePath); err == nil && st.IsDir() {
-		if m.isGitDir(ctx, worktreePath) == nil {
-			// reuse existing
-		} else {
-			// try force re-add on top of existing content
-			if err := m.addWorktree(ctx, repoRoot, worktreePath, projectPath, threadID, branchName, true); err != nil {
-				return "", "", "", err
+    if st, err := os.Stat(worktreePath); err == nil && st.IsDir() {
+        if ok, _ := m.git.IsRepoPath(ctx, worktreePath); ok {
+            // reuse existing
+        } else {
+            // try force re-add on top of existing content
+            if err := m.addWorktree(ctx, repoRoot, worktreePath, projectPath, threadID, branchName, true); err != nil {
+                return "", "", "", err
 			}
 		}
 	} else {
@@ -102,10 +107,10 @@ func (m *Manager) RemoveForThread(ctx context.Context, worktreePath string) erro
 	if !m.withinRoot(worktreePath) {
 		return fmt.Errorf("worktree path outside managed root")
 	}
-	repoRoot, err := m.gitShowTopLevel(ctx, worktreePath)
-	if err != nil {
-		return nil // best effort
-	}
+    repoRoot, err := m.git.RepoRoot(ctx, worktreePath)
+    if err != nil {
+        return nil // best effort
+    }
 	// git worktree remove --force <path>
 	if _, err := m.runGit(ctx, repoRoot, "worktree", "remove", "--force", worktreePath); err != nil {
 		// ignore if already gone
@@ -116,10 +121,10 @@ func (m *Manager) RemoveForThread(ctx context.Context, worktreePath string) erro
 }
 
 func (m *Manager) addWorktree(ctx context.Context, repoRoot, worktreePath, projectPath string, threadID int64, branchName string, force bool) error {
-	baseRef, err := m.currentBranchOrHead(ctx, projectPath)
-	if err != nil {
-		return err
-	}
+    baseRef, err := m.git.CurrentRef(ctx, projectPath)
+    if err != nil {
+        return err
+    }
 	branch := strings.TrimSpace(branchName)
 	if branch == "" {
 		branch = fmt.Sprintf("codex/thread/%d", threadID)
@@ -135,34 +140,7 @@ func (m *Manager) addWorktree(ctx context.Context, repoRoot, worktreePath, proje
 	return nil
 }
 
-func (m *Manager) currentBranchOrHead(ctx context.Context, path string) (string, error) {
-	// Prefer branch name; fallback to commit hash
-	out, err := m.runGit(ctx, path, "symbolic-ref", "--short", "-q", "HEAD")
-	if err == nil {
-		branch := strings.TrimSpace(out)
-		if branch != "" {
-			return branch, nil
-		}
-	}
-	out, err = m.runGit(ctx, path, "rev-parse", "HEAD")
-	if err != nil {
-		return "", fmt.Errorf("resolve base ref: %w", err)
-	}
-	return strings.TrimSpace(out), nil
-}
-
-func (m *Manager) isGitDir(ctx context.Context, path string) error {
-	_, err := m.runGit(ctx, path, "rev-parse", "--is-inside-work-tree")
-	return err
-}
-
-func (m *Manager) gitShowTopLevel(ctx context.Context, path string) (string, error) {
-	out, err := m.runGit(ctx, path, "rev-parse", "--show-toplevel")
-	if err != nil {
-		return "", err
-	}
-	return strings.TrimSpace(out), nil
-}
+// currentBranchOrHead/isGitDir/gitShowTopLevel now delegated via m.git
 
 func (m *Manager) runGit(ctx context.Context, dir string, args ...string) (string, error) {
 	cmd := exec.CommandContext(ctx, m.gitBin, args...)
