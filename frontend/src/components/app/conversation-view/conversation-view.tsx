@@ -13,6 +13,7 @@ export type ConversationViewProps = {
   isLoading: boolean
   isFetchingMore: boolean
   onLoadOlder?: () => Promise<unknown> | void
+  threadId?: number | null
   isStreaming: boolean
   streamStatus: string
   projectName: string
@@ -24,6 +25,7 @@ export function ConversationView({
   isLoading,
   isFetchingMore,
   onLoadOlder,
+  threadId,
   isStreaming,
   streamStatus,
   projectName
@@ -52,18 +54,30 @@ export function ConversationView({
   const lastTopStateRef = useRef(false)
   const prevLengthRef = useRef(entries.length)
   const wasFetchingMoreRef = useRef(isFetchingMore)
+  const activeThreadRef = useRef<number | null | undefined>(threadId)
+  const initialScrollPendingRef = useRef(true)
 
   useEffect(() => {
-    if (wasFetchingMoreRef.current && !isFetchingMore) {
-      const delta = entries.length - prevLengthRef.current
-      if (delta > 0 && virtuosoRef.current) {
-        virtuosoRef.current.scrollToIndex({ index: delta, align: "start", behavior: "auto" })
-      }
-    } else if (prevLengthRef.current === 0 && entries.length > 0 && virtuosoRef.current) {
+    if (threadId !== activeThreadRef.current) {
+      activeThreadRef.current = threadId
+      initialScrollPendingRef.current = true
+      prevLengthRef.current = 0
+      wasFetchingMoreRef.current = false
+    }
+  }, [threadId])
+
+  useEffect(() => {
+    if (initialScrollPendingRef.current && entries.length > 0 && virtuosoRef.current) {
+      initialScrollPendingRef.current = false
       const targetIndex = entries.length - 1
       requestAnimationFrame(() => {
         virtuosoRef.current?.scrollToIndex({ index: targetIndex, align: "end", behavior: "auto" })
       })
+    } else if (wasFetchingMoreRef.current && !isFetchingMore) {
+      const delta = entries.length - prevLengthRef.current
+      if (delta > 0 && virtuosoRef.current) {
+        virtuosoRef.current.scrollToIndex({ index: delta, align: "start", behavior: "auto" })
+      }
     }
     prevLengthRef.current = entries.length
     wasFetchingMoreRef.current = isFetchingMore

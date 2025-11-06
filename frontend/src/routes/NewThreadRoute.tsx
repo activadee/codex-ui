@@ -74,6 +74,7 @@ export default function NewThreadRoute() {
             isLoading={false}
             isFetchingMore={false}
             onLoadOlder={() => {}}
+            threadId={null}
             isStreaming={workspace.stream.isStreaming}
             streamStatus={workspace.stream.status}
           />

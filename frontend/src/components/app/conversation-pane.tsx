@@ -11,6 +11,7 @@ type ConversationPaneProps = {
   isLoading: boolean
   isFetchingMore: boolean
   onLoadOlder?: () => Promise<unknown> | void
+  threadId?: number | null
   isStreaming: boolean
   streamStatus: string
 }
@@ -23,6 +24,7 @@ export function ConversationPane({
   isLoading,
   isFetchingMore,
   onLoadOlder,
+  threadId,
   isStreaming,
   streamStatus
 }: ConversationPaneProps) {
@@ -45,6 +47,7 @@ export function ConversationPane({
         isLoading={isLoading}
         isFetchingMore={isFetchingMore}
         onLoadOlder={onLoadOlder}
+        threadId={threadId}
         isStreaming={isStreaming}
         streamStatus={streamStatus}
       />
