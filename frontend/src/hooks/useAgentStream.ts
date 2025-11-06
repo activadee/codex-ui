@@ -47,7 +47,7 @@ export function useAgentStream(options: UseAgentStreamOptions = {}) {
       let changed = false
       const next = { ...prev }
 
-      if (previousThreadId && previousThreadId !== options.threadId && next[previousThreadId]) {
+      if (previousThreadId && previousThreadId !== options.threadId && next[previousThreadId]?.status !== "streaming") {
         delete next[previousThreadId]
         changed = true
       }
@@ -83,11 +83,6 @@ export function useAgentStream(options: UseAgentStreamOptions = {}) {
         return
       }
 
-      const currentActive = activeThreadRef.current
-      if (currentActive && threadId !== currentActive) {
-        return
-      }
-
       optionsRef.current.onEvent?.(event, context)
 
       if (event.usage) {
@@ -113,6 +108,18 @@ export function useAgentStream(options: UseAgentStreamOptions = {}) {
           streamId: undefined
         }))
         optionsRef.current.onComplete?.(threadId, event.message ?? status, streamId)
+
+        if (activeThreadRef.current !== threadId) {
+          setThreadStates((prev) => {
+            if (!prev[threadId]) {
+              return prev
+            }
+            const next = { ...prev }
+            delete next[threadId]
+            threadStatesRef.current = next
+            return next
+          })
+        }
       }
     },
     [updateThreadState]
@@ -178,12 +185,7 @@ export function useAgentStream(options: UseAgentStreamOptions = {}) {
     },
     [router, updateThreadState]
   )
-  useEffect(() => {
-    if (!options.threadId) {
-      return
-    }
-    return router.subscribeToStream(options.threadId, handleStreamEvent)
-  }, [router, handleStreamEvent, options.threadId])
+  useEffect(() => router.subscribeToStream(options.threadId, handleStreamEvent), [router, handleStreamEvent, options.threadId])
 
   const isAnyStreaming = useMemo(
     () => Object.values(threadStatesRef.current).some((state) => state.status === "streaming"),
