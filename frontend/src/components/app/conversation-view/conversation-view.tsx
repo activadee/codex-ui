@@ -19,6 +19,7 @@ export function ConversationView({ entries, isStreaming, streamStatus, projectNa
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
   const pendingScrollRef = useRef<boolean>(false)
+  const lastEntryId = hasContent ? entries[entries.length - 1].id : "__none__"
 
   // When the active thread changes, schedule a one-time scroll to bottom.
   useEffect(() => {
@@ -26,28 +27,34 @@ export function ConversationView({ entries, isStreaming, streamStatus, projectNa
     pendingScrollRef.current = true
   }, [threadId])
 
-  // Perform the pending scroll once entries update after a thread change.
+  // Perform the pending scroll once the thread swaps or the latest entry changes.
   useEffect(() => {
     if (!pendingScrollRef.current) return
-    // Try to scroll immediately; if items are not rendered yet, rAF will try again next frame.
-    const scrollToBottom = () => {
+    let tries = 0
+    const maxTries = 10
+    const attempt = () => {
+      // Prefer scrolling the bottom sentinel when available
       if (bottomRef.current) {
         bottomRef.current.scrollIntoView({ behavior: "auto", block: "end" })
         pendingScrollRef.current = false
         return
       }
-      // Fallback: scroll container to its scrollHeight
+      // Fallback to container scroll position
       const el = scrollContainerRef.current
       if (el) {
         el.scrollTop = el.scrollHeight
-        pendingScrollRef.current = false
-        return
       }
-      // If neither exists yet, try next frame
-      requestAnimationFrame(scrollToBottom)
+      // Retry for a few frames to allow content to render
+      if (tries < maxTries) {
+        tries += 1
+        requestAnimationFrame(attempt)
+      } else {
+        // Give up and clear the pending flag to avoid getting stuck
+        pendingScrollRef.current = false
+      }
     }
-    scrollToBottom()
-  }, [entries.length])
+    requestAnimationFrame(attempt)
+  }, [threadId, lastEntryId])
 
   if (!hasContent && !isStreaming) {
     return (
