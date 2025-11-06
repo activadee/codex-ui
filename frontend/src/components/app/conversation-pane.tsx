@@ -35,6 +35,7 @@ export function ConversationPane({
         entries={entries}
         isStreaming={isStreaming}
         streamStatus={streamStatus}
+        threadId={thread?.id}
       />
     </WorkspacePanel>
   )
