@@ -97,94 +97,17 @@ jobs:
           path: codex-ui-${{ matrix.artifact_suffix }}.zip
 
   publish:
-    name: Publish Release
-    runs-on: ubuntu-latest
     needs: build
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v5
-        with:
-          fetch-depth: 0
-          ref: ${{ inputs.target }}
-
-      - name: Determine previous tag
-        id: prev_tag
-        run: |
-          git fetch --tags --quiet
-          LAST_TAG=$(git describe --tags --abbrev=0 --match "v*" 2>/dev/null || echo "")
-          echo "value=$LAST_TAG" >> "$GITHUB_OUTPUT"
-
-      - name: Build Codex prompt
-        id: prompt
-        run: |
-          TAG_NAME="${{ inputs.tag_name }}"
-          LAST_TAG="${{ steps.prev_tag.outputs.value }}"
-          if [ -z "$LAST_TAG" ]; then
-            RANGE_DESC="project start"
-            COMMITS=$(git log --pretty=format:'- %s (%h)' --no-merges)
-          else
-            RANGE_DESC="${LAST_TAG}..${GITHUB_SHA}"
-            COMMITS=$(git log --pretty=format:'- %s (%h)' --no-merges "${LAST_TAG}..${GITHUB_SHA}")
-          fi
-
-          if [ -z "$COMMITS" ]; then
-            COMMITS="- No new commits detected."
-          fi
-
-          TEMPLATE=$(cat .github/prompts/codex-release-template.md)
-
-          cat <<EOF > codex_prompt.md
-          ${TEMPLATE}
-
-          Release tag: ${TAG_NAME}
-          Commit range: ${RANGE_DESC}
-
-          Commits:
-          ${COMMITS}
-          EOF
-
-      - name: Load release schema
-        run: echo "CODEX_OUTPUT_SCHEMA=$(jq -c . .github/prompts/codex-release-schema.json)" >> "$GITHUB_ENV"
-
-      - name: Generate release highlights with Codex
-        uses: activadee/codex-action@main
-        with:
-          codex-auth-json-b64: ${{ secrets.CODEX_AUTH_JSON_B64 }}
-          prompt-file: codex_prompt.md
-          output-file: codex-release.json
-          output-schema: ${{ env.CODEX_OUTPUT_SCHEMA }}
-          safety-strategy: drop-sudo
-
-      - name: Render release notes
-        id: render
-        run: |
-          SUMMARY=$(jq -r '.overview // empty' codex-release.json)
-          {
-            if [ -n "$SUMMARY" ]; then
-              echo "$SUMMARY"
-              echo
-            fi
-            jq -r '.highlights[] | "- " + .' codex-release.json
-          } > release-notes.md
-          {
-            echo "notes<<EOF"
-            cat release-notes.md
-            echo "EOF"
-          } >> "$GITHUB_OUTPUT"
-
-      - name: Download build artifacts
-        uses: actions/download-artifact@v6
-        with:
-          path: dist
-
-      - name: Publish GitHub release
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ inputs.tag_name }}
-          target_commitish: ${{ inputs.target }}
-          name: ${{ inputs.release_title || inputs.tag_name }}
-          draft: ${{ inputs.draft }}
-          body_path: release-notes.md
-          files: |
-            dist/**/*.tar.gz
-            dist/**/*.zip
+    uses: activadee/codex-shared-workflows/.github/workflows/release.yml@main
+    secrets: inherit
+    with:
+      tag_name: ${{ inputs.tag_name }}
+      release_title: ${{ inputs.release_title }}
+      target: ${{ inputs.target }}
+      draft: ${{ inputs.draft }}
+      run_tests: false
+      download_artifacts: true
+      artifacts_path: dist
+      artifact_glob: |
+        dist/**/*.tar.gz
+        dist/**/*.zip

@@ -8,18 +8,6 @@ on:
 
 jobs:
   test:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v5
-
-      - name: Set up Go
-        uses: actions/setup-go@v6
-        with:
-          go-version-file: go.mod
-          cache: true
-      - name: Ensure frontend dist directory
-        run: mkdir -p frontend/dist && touch frontend/dist/.placeholder
-
-      - name: Run tests
-        run: go test ./...
+    uses: activadee/codex-shared-workflows/.github/workflows/go-tests.yml@main
+    with:
+      pre_test: mkdir -p frontend/dist && touch frontend/dist/.placeholder
