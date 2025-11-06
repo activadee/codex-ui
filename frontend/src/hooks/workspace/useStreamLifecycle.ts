@@ -45,6 +45,7 @@ export function useStreamLifecycle(options: StreamLifecycleOptions) {
   } = options
 
   const { startStream, cancelStream, getThreadState } = useAgentStream({
+    threadId: activeThreadId ?? undefined,
     onEvent: (event, context) => {
       const targetThreadId = context.threadId ?? activeThreadId ?? undefined
       if (!targetThreadId) {

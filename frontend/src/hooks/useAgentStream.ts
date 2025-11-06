@@ -10,6 +10,7 @@ type StreamStatus = "idle" | "streaming" | "completed" | "stopped" | "error"
 type StreamContext = { threadId?: number; streamId?: string }
 
 type UseAgentStreamOptions = {
+  threadId?: number
   onEvent?: (event: StreamEventPayload, context: StreamContext) => void
   onComplete?: (threadId: number, status: string, streamId?: string) => void
   onError?: (message: string, context: StreamContext) => void
@@ -32,10 +33,38 @@ export function useAgentStream(options: UseAgentStreamOptions = {}) {
   const threadStatesRef = useRef<Record<number, ThreadStreamState>>({})
   const optionsRef = useRef(options)
   const router = useThreadEventRouter()
+  const activeThreadRef = useRef<number | undefined>(options.threadId)
 
   useEffect(() => {
     optionsRef.current = options
   }, [options])
+
+  useEffect(() => {
+    const previousThreadId = activeThreadRef.current
+    activeThreadRef.current = options.threadId
+
+    setThreadStates((prev) => {
+      let changed = false
+      const next = { ...prev }
+
+      if (previousThreadId && previousThreadId !== options.threadId && next[previousThreadId]) {
+        delete next[previousThreadId]
+        changed = true
+      }
+
+      if (options.threadId && !next[options.threadId]) {
+        next[options.threadId] = idleState
+        changed = true
+      }
+
+      if (!changed) {
+        return prev
+      }
+
+      threadStatesRef.current = next
+      return next
+    })
+  }, [options.threadId])
 
   const updateThreadState = useCallback((threadId: number, updater: (prev: ThreadStreamState) => ThreadStreamState) => {
     setThreadStates((prev) => {
@@ -51,6 +80,11 @@ export function useAgentStream(options: UseAgentStreamOptions = {}) {
     (event: StreamEventPayload, context: StreamContext) => {
       const { threadId, streamId } = context
       if (!threadId || !streamId) {
+        return
+      }
+
+      const currentActive = activeThreadRef.current
+      if (currentActive && threadId !== currentActive) {
         return
       }
 
@@ -144,7 +178,12 @@ export function useAgentStream(options: UseAgentStreamOptions = {}) {
     },
     [router, updateThreadState]
   )
-  useEffect(() => router.subscribeToStream(undefined, handleStreamEvent), [router, handleStreamEvent])
+  useEffect(() => {
+    if (!options.threadId) {
+      return
+    }
+    return router.subscribeToStream(options.threadId, handleStreamEvent)
+  }, [router, handleStreamEvent, options.threadId])
 
   const isAnyStreaming = useMemo(
     () => Object.values(threadStatesRef.current).some((state) => state.status === "streaming"),
