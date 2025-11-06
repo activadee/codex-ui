@@ -34,6 +34,10 @@ export function LoadThreadConversation(arg1) {
   return window['go']['agents']['API']['LoadThreadConversation'](arg1);
 }
 
+export function LoadThreadConversationPage(arg1) {
+  return window['go']['agents']['API']['LoadThreadConversationPage'](arg1);
+}
+
 export function RenameThread(arg1, arg2) {
   return window['go']['agents']['API']['RenameThread'](arg1, arg2);
 }

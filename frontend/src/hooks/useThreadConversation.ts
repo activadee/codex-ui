@@ -1,7 +1,8 @@
-import { useCallback } from "react"
-import { useQuery, useQueryClient } from "@tanstack/react-query"
+import { useMemo } from "react"
+import { useInfiniteQuery } from "@tanstack/react-query"
 
-import { LoadThreadConversation } from "../../wailsjs/go/agents/API"
+import { LoadThreadConversationPage } from "../../wailsjs/go/agents/API"
+import { agents } from "../../wailsjs/go/models"
 import type {
   AgentConversationEntry,
   AgentItemPayload,
@@ -59,41 +60,69 @@ export function normaliseConversation(entries: any[]): ConversationEntry[] {
   })
 }
 
+type ConversationPage = {
+  entries: ConversationEntry[]
+  nextCursor?: string
+  hasMore: boolean
+}
+
+const PAGE_SIZE = 30
+
 export function useThreadConversation(threadId: number | null) {
-  const queryClient = useQueryClient()
-
-  const queryKey = ["conversation", threadId ?? "none"]
-
-  const conversationQuery = useQuery({
-    queryKey,
+  const conversationQuery = useInfiniteQuery<ConversationPage, Error>({
+    queryKey: ["conversation", threadId ?? "none"],
     enabled: Boolean(threadId),
-    queryFn: async (): Promise<ConversationEntry[]> => {
+    initialPageParam: undefined,
+    queryFn: async ({ pageParam }): Promise<ConversationPage> => {
       if (!threadId) {
-        return []
+        return { entries: [], hasMore: false }
       }
-      const response = await LoadThreadConversation(threadId)
-      return normaliseConversation(response)
+      const request: agents.ConversationPageRequest = {
+        threadId,
+        limit: PAGE_SIZE
+      }
+      if (typeof pageParam === "string" && pageParam.trim().length > 0) {
+        request.cursor = pageParam
+      }
+      const response = agents.ConversationPageDTO.createFrom(await LoadThreadConversationPage(request))
+      const rawCursor = response.nextCursor
+      let nextCursor: string | undefined
+      if (typeof rawCursor === "string" && rawCursor.trim().length > 0) {
+        nextCursor = rawCursor
+      }
+      return {
+        entries: normaliseConversation(response.entries ?? []),
+        nextCursor,
+        hasMore: Boolean(response.hasMore)
+      }
     },
-    staleTime: Number.POSITIVE_INFINITY,
+    getNextPageParam: (lastPage) => (lastPage.nextCursor ? lastPage.nextCursor : undefined),
     gcTime: 120_000
   })
 
-  const setConversation = useCallback(
-    (updater: (current: ConversationEntry[]) => ConversationEntry[]) => {
-      queryClient.setQueryData<ConversationEntry[]>(queryKey, (prev = []) => updater(prev))
-    },
-    [queryClient, queryKey]
-  )
+  const entries = useMemo(() => {
+    if (!conversationQuery.data) {
+      return [] as ConversationEntry[]
+    }
+    const pages = conversationQuery.data.pages ?? []
+    if (pages.length === 0) {
+      return [] as ConversationEntry[]
+    }
+    return [...pages]
+      .reverse()
+      .flatMap((page) => page.entries ?? [])
+  }, [conversationQuery.data])
+
+  const errorMessage = conversationQuery.error ? conversationQuery.error.message ?? "Failed to load conversation" : null
 
   return {
-    entries: conversationQuery.data ?? [],
-    isLoading: conversationQuery.isPending || conversationQuery.isFetching,
-    error: conversationQuery.error
-      ? conversationQuery.error instanceof Error
-        ? conversationQuery.error.message
-        : "Failed to load conversation"
-      : null,
-    refetch: () => conversationQuery.refetch(),
-    setConversation
+    entries,
+    isLoading: conversationQuery.isPending,
+    isFetching: conversationQuery.isFetching,
+    isFetchingMore: conversationQuery.isFetchingNextPage,
+    hasMore: conversationQuery.hasNextPage ?? false,
+    fetchMore: conversationQuery.fetchNextPage,
+    error: errorMessage,
+    refetch: conversationQuery.refetch
   }
 }

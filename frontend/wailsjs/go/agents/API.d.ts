@@ -18,6 +18,8 @@ export function ListThreads(arg1:number):Promise<Array<agents.ThreadDTO>>;
 
 export function LoadThreadConversation(arg1:number):Promise<Array<agents.ConversationEntryDTO>>;
 
+export function LoadThreadConversationPage(arg1:agents.ConversationPageRequest):Promise<agents.ConversationPageDTO>;
+
 export function RenameThread(arg1:number,arg2:string):Promise<agents.ThreadDTO>;
 
 export function Send(arg1:agents.MessageRequest):Promise<agents.StreamHandle>;

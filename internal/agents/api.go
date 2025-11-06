@@ -1,30 +1,33 @@
 package agents
 
 import (
-    "context"
-    "fmt"
-    "strings"
+	"context"
+	"fmt"
+	"strconv"
+	"strings"
 
-    "codex-ui/internal/git/worktrees"
-    "codex-ui/internal/storage/discovery"
-    "codex-ui/internal/watchers"
-    "codex-ui/internal/logging"
+	"codex-ui/internal/git/worktrees"
+	"codex-ui/internal/logging"
+	"codex-ui/internal/storage/discovery"
+	"codex-ui/internal/watchers"
 
 	wailsruntime "github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
 // API exposes agent operations to the frontend and emits runtime events.
 type API struct {
-    svc   *Service
-    repo  *discovery.Repository
-    watch *watchers.Service
-    ctxFn func() context.Context
-    log   logging.Logger
+	svc   *Service
+	repo  *discovery.Repository
+	watch *watchers.Service
+	ctxFn func() context.Context
+	log   logging.Logger
 }
 
 func NewAPI(svc *Service, repo *discovery.Repository, watch *watchers.Service, ctxProvider func() context.Context, logger logging.Logger) *API {
-    if logger == nil { logger = logging.Nop() }
-    return &API{svc: svc, repo: repo, watch: watch, ctxFn: ctxProvider, log: logger}
+	if logger == nil {
+		logger = logging.Nop()
+	}
+	return &API{svc: svc, repo: repo, watch: watch, ctxFn: ctxProvider, log: logger}
 }
 
 // Send streams a prompt through the configured agent and emits runtime events.
@@ -82,6 +85,21 @@ func (a *API) GetThread(threadID int64) (ThreadDTO, error) {
 func (a *API) LoadThreadConversation(threadID int64) ([]ConversationEntryDTO, error) {
 	return a.svc.LoadThreadConversation(context.Background(), threadID)
 }
+
+func (a *API) LoadThreadConversationPage(req ConversationPageRequest) (ConversationPageDTO, error) {
+	if a.svc == nil {
+		return ConversationPageDTO{}, fmt.Errorf("agent service not initialised")
+	}
+	cursorID := int64(0)
+	if trimmed := strings.TrimSpace(req.Cursor); trimmed != "" {
+		value, err := strconv.ParseInt(trimmed, 10, 64)
+		if err != nil {
+			return ConversationPageDTO{}, fmt.Errorf("invalid cursor: %w", err)
+		}
+		cursorID = value
+	}
+	return a.svc.LoadThreadConversationPage(context.Background(), req.ThreadID, cursorID, req.Limit)
+}
 func (a *API) RenameThread(threadID int64, title string) (ThreadDTO, error) {
 	return a.svc.RenameThread(context.Background(), threadID, title)
 }
@@ -121,22 +139,22 @@ func (a *API) CreatePullRequest(threadID int64) (string, error) {
 	if worktree == "" {
 		return "", fmt.Errorf("thread %d has no worktree", threadID)
 	}
-    diffs, err := a.svc.ListThreadDiffStats(context.Background(), threadID)
-    if err != nil {
-        return "", err
-    }
-    if len(diffs) == 0 {
-        return "", fmt.Errorf("no file changes detected")
-    }
-    // Resolve branch name with fallback and persist if missing
-    branch := strings.TrimSpace(thread.BranchName)
-    if branch == "" {
-        branch = worktrees.BranchName(thread.Title, thread.ID)
-        // best-effort persist before running the PR job
-        _ = a.repo.UpdateThreadBranchName(context.Background(), thread.ID, branch)
-    }
-    instruction := BuildCreatePRInstruction(branch)
-    stream, err := StartBackgroundPRStream(worktree, "danger-full-access", instruction)
+	diffs, err := a.svc.ListThreadDiffStats(context.Background(), threadID)
+	if err != nil {
+		return "", err
+	}
+	if len(diffs) == 0 {
+		return "", fmt.Errorf("no file changes detected")
+	}
+	// Resolve branch name with fallback and persist if missing
+	branch := strings.TrimSpace(thread.BranchName)
+	if branch == "" {
+		branch = worktrees.BranchName(thread.Title, thread.ID)
+		// best-effort persist before running the PR job
+		_ = a.repo.UpdateThreadBranchName(context.Background(), thread.ID, branch)
+	}
+	instruction := BuildCreatePRInstruction(branch)
+	stream, err := StartBackgroundPRStream(worktree, "danger-full-access", instruction)
 	if err != nil {
 		return "", err
 	}
@@ -169,10 +187,12 @@ func (a *API) emitDiff(threadID int64) {
 		return
 	}
 	stats, err := a.svc.ListThreadDiffStats(context.Background(), threadID)
-    if err != nil {
-        if a.log != nil { a.log.Warn("list thread diff stats failed", "threadID", threadID, "error", err) }
-        return
-    }
+	if err != nil {
+		if a.log != nil {
+			a.log.Warn("list thread diff stats failed", "threadID", threadID, "error", err)
+		}
+		return
+	}
 	payload := struct {
 		ThreadID int64             `json:"threadId"`
 		Files    []FileDiffStatDTO `json:"files"`

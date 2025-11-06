@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
-import { useQueryClient } from "@tanstack/react-query"
+import { useQueryClient, type InfiniteData } from "@tanstack/react-query"
 
 import type {
   AgentConversationEntry,
@@ -11,7 +11,7 @@ import type {
   UserMessageSegment
 } from "@/types/app"
 import { DeleteAttachment } from "../../wailsjs/go/attachments/API"
-import { LoadThreadConversation } from "../../wailsjs/go/agents/API"
+import { LoadThreadConversationPage } from "../../wailsjs/go/agents/API"
 import { agents } from "../../wailsjs/go/models"
 import { useProjects } from "@/hooks/useProjects"
 import { useAgentThreads } from "@/hooks/useAgentThreads"
@@ -37,6 +37,14 @@ type SendMessageOptions = {
   attachmentPaths?: string[]
   segments?: UserMessageSegment[]
 }
+
+type ConversationPageState = {
+  entries: ConversationEntry[]
+  nextCursor?: string
+  hasMore: boolean
+}
+
+const PAGE_SIZE = 30
 
 export function useWorkspaceController() {
   const queryClient = useQueryClient()
@@ -81,9 +89,17 @@ export function useWorkspaceController() {
       if (threadId <= 0) {
         return
       }
-      queryClient.setQueryData<ConversationEntry[]>(["conversation", threadId], (prev) => prev ?? [])
+      queryClient.setQueryData<InfiniteData<ConversationPageState>>(["conversation", threadId], (prev) => {
+        if (prev) {
+          return prev
+        }
+        return {
+          pages: [{ entries: [], nextCursor: undefined, hasMore: false }],
+          pageParams: [undefined]
+        }
+      })
     },
-    [queryClient]
+    [normaliseConversation, queryClient]
   )
 
   const getConversationEntries = useCallback(
@@ -91,17 +107,13 @@ export function useWorkspaceController() {
       if (threadId <= 0) {
         return []
       }
-      return queryClient.getQueryData<ConversationEntry[]>(["conversation", threadId]) ?? []
-    },
-    [queryClient]
-  )
-
-  const updateConversationEntries = useCallback(
-    (threadId: number, updater: (entries: ConversationEntry[]) => ConversationEntry[]) => {
-      if (threadId <= 0) {
-        return
+      const data = queryClient.getQueryData<InfiniteData<ConversationPageState>>(["conversation", threadId])
+      if (!data) {
+        return []
       }
-      queryClient.setQueryData<ConversationEntry[]>(["conversation", threadId], (prev = []) => updater(prev))
+      return [...data.pages]
+        .reverse()
+        .flatMap((page) => page.entries ?? [])
     },
     [queryClient]
   )
@@ -142,12 +154,27 @@ export function useWorkspaceController() {
   const appendUserEntry = useCallback(
     (threadId: number, entry: UserConversationEntry) => {
       ensureTimeline(threadId)
-      updateConversationEntries(threadId, (existing) => [...existing, entry])
+      queryClient.setQueryData<InfiniteData<ConversationPageState>>(["conversation", threadId], (prev) => {
+        if (!prev) {
+          return {
+            pages: [{ entries: [entry], nextCursor: undefined, hasMore: false }],
+            pageParams: [undefined]
+          }
+        }
+        const pageParams = prev.pageParams ? [...prev.pageParams] : []
+        const pages = prev.pages.map((page) => ({ ...page, entries: [...page.entries] }))
+        if (pages.length === 0) {
+          pages.push({ entries: [], nextCursor: undefined, hasMore: false })
+          pageParams.push(undefined)
+        }
+        pages[0] = { ...pages[0], entries: [...pages[0].entries, entry] }
+        return { pages, pageParams }
+      })
       if (entry.text?.trim()) {
         applyThreadPreview(threadId, entry.text, entry.createdAt)
       }
     },
-    [applyThreadPreview, ensureTimeline, updateConversationEntries]
+    [applyThreadPreview, ensureTimeline, queryClient]
   )
 
   const upsertAgentEntry = useCallback(
@@ -155,19 +182,7 @@ export function useWorkspaceController() {
       const identifier = item.id && item.id.trim() ? item.id : `agent-${Date.now().toString(36)}`
       const timestamp = new Date().toISOString()
       ensureTimeline(threadId)
-      updateConversationEntries(threadId, (existing) => {
-        const index = existing.findIndex((entry) => entry.role === "agent" && entry.id === identifier)
-        if (index >= 0) {
-          const current = existing[index] as AgentConversationEntry
-          const nextEntry: AgentConversationEntry = {
-            ...current,
-            item: { ...item, id: identifier },
-            updatedAt: timestamp
-          }
-          const nextList = [...existing]
-          nextList[index] = nextEntry
-          return nextList
-        }
+      queryClient.setQueryData<InfiniteData<ConversationPageState>>(["conversation", threadId], (prev) => {
         const nextEntry: AgentConversationEntry = {
           id: identifier,
           role: "agent",
@@ -175,22 +190,66 @@ export function useWorkspaceController() {
           updatedAt: timestamp,
           item: { ...item, id: identifier }
         }
-        return [...existing, nextEntry]
+        if (!prev) {
+          return {
+            pages: [{ entries: [nextEntry], nextCursor: undefined, hasMore: false }],
+            pageParams: [undefined]
+          }
+        }
+        const pageParams = prev.pageParams ? [...prev.pageParams] : []
+        const pages = prev.pages.map((page) => ({ ...page, entries: [...page.entries] }))
+        let updated = false
+        for (const page of pages) {
+          const index = page.entries.findIndex((entry) => entry.role === "agent" && entry.id === identifier)
+          if (index >= 0) {
+            const current = page.entries[index] as AgentConversationEntry
+            page.entries[index] = {
+              ...current,
+              item: { ...item, id: identifier },
+              updatedAt: timestamp
+            }
+            updated = true
+            break
+          }
+        }
+        if (!updated) {
+          if (pages.length === 0) {
+            pages.push({ entries: [], nextCursor: undefined, hasMore: false })
+            pageParams.push(undefined)
+          }
+          pages[0] = { ...pages[0], entries: [...pages[0].entries, nextEntry] }
+        }
+        return { pages, pageParams }
       })
 
       if (item.type === "agent_message" && item.text) {
         applyThreadPreview(threadId, item.text, timestamp)
       }
     },
-    [applyThreadPreview, ensureTimeline, updateConversationEntries]
+    [applyThreadPreview, ensureTimeline, queryClient]
   )
 
   const appendSystemEntry = useCallback(
     (threadId: number, entry: SystemConversationEntry) => {
       ensureTimeline(threadId)
-      updateConversationEntries(threadId, (existing) => [...existing, entry])
+      queryClient.setQueryData<InfiniteData<ConversationPageState>>(["conversation", threadId], (prev) => {
+        if (!prev) {
+          return {
+            pages: [{ entries: [entry], nextCursor: undefined, hasMore: false }],
+            pageParams: [undefined]
+          }
+        }
+        const pageParams = prev.pageParams ? [...prev.pageParams] : []
+        const pages = prev.pages.map((page) => ({ ...page, entries: [...page.entries] }))
+        if (pages.length === 0) {
+          pages.push({ entries: [], nextCursor: undefined, hasMore: false })
+          pageParams.push(undefined)
+        }
+        pages[0] = { ...pages[0], entries: [...pages[0].entries, entry] }
+        return { pages, pageParams }
+      })
     },
-    [ensureTimeline, updateConversationEntries]
+    [ensureTimeline, queryClient]
   )
 
   const syncThreadPreviewFromConversation = useCallback(
@@ -209,15 +268,20 @@ export function useWorkspaceController() {
       if (!threadId || threadId <= 0) {
         return
       }
+      const existing = queryClient.getQueryData<InfiniteData<ConversationPageState>>(["conversation", threadId])
+      if (existing) {
+        return
+      }
       try {
-        await queryClient.ensureQueryData({
-          queryKey: ["conversation", threadId],
-          queryFn: async () => {
-            const response = await LoadThreadConversation(threadId)
-            return normaliseConversation(response)
-          },
-          staleTime: Number.POSITIVE_INFINITY,
-          gcTime: 120_000
+        const response = await LoadThreadConversationPage({ threadId, limit: PAGE_SIZE })
+        const page: ConversationPageState = {
+          entries: normaliseConversation(response.entries ?? []),
+          nextCursor: response.nextCursor,
+          hasMore: Boolean(response.hasMore)
+        }
+        queryClient.setQueryData<InfiniteData<ConversationPageState>>(["conversation", threadId], {
+          pages: [page],
+          pageParams: [undefined]
         })
       } catch (error) {
         console.error("Failed to prefetch conversation", error)
@@ -255,7 +319,13 @@ export function useWorkspaceController() {
     [selectedThread]
   )
 
-  const { entries: conversationEntries } = useThreadConversation(activeThreadId)
+  const {
+    entries: conversationEntries,
+    fetchMore: fetchOlderMessages,
+    hasMore: conversationHasMore,
+    isFetching: isConversationFetching,
+    isFetchingMore: isFetchingOlderMessages
+  } = useThreadConversation(activeThreadId)
 
   const { startStream, cancelStream, state: streamState } = useAgentStream({
     threadId: activeThreadId ?? undefined,
@@ -361,8 +431,8 @@ export function useWorkspaceController() {
     if (!activeThreadId) {
       return
     }
-    void queryClient.ensureQueryData({ queryKey: ["conversation", activeThreadId] })
-  }, [queryClient, activeThreadId])
+    void prefetchConversation(activeThreadId)
+  }, [activeThreadId, prefetchConversation])
 
   const handleNewThread = useCallback(() => {
     setActiveThreadId(null)
@@ -505,7 +575,11 @@ export function useWorkspaceController() {
       remove: deleteThread
     },
     conversation: {
-      list: conversationEntries
+      list: conversationEntries,
+      fetchOlder: fetchOlderMessages,
+      hasMore: conversationHasMore,
+      isFetching: isConversationFetching,
+      isFetchingMore: isFetchingOlderMessages
     },
     stream: {
       isStreaming: isThreadStreaming,

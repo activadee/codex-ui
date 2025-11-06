@@ -25,8 +25,8 @@ type Thread struct {
 	ExternalID       string       `json:"externalId,omitempty"`
 	ConversationPath string       `json:"conversationPath,omitempty"`
 	WorktreePath     string       `json:"worktreePath,omitempty"`
-    BranchName       string       `json:"branchName,omitempty"`
-    PRURL            string       `json:"prUrl,omitempty"`
+	BranchName       string       `json:"branchName,omitempty"`
+	PRURL            string       `json:"prUrl,omitempty"`
 	Title            string       `json:"title"`
 	Model            string       `json:"model"`
 	SandboxMode      string       `json:"sandboxMode"`
@@ -80,8 +80,8 @@ func (r *Repository) GetThread(ctx context.Context, id int64) (Thread, error) {
 		externalID      sql.NullString
 		conversationRaw sql.NullString
 		worktreePath    sql.NullString
-        prURL           sql.NullString
-        branchName      sql.NullString
+		prURL           sql.NullString
+		branchName      sql.NullString
 		lastMessageAt   sql.NullTime
 	)
 	err := r.db.QueryRowContext(ctx, `
@@ -265,7 +265,7 @@ func (r *Repository) UpdateThreadConversationPath(ctx context.Context, id int64,
 
 // UpdateThreadWorktreePath stores the local worktree path for a thread.
 func (r *Repository) UpdateThreadWorktreePath(ctx context.Context, id int64, path string) error {
-    _, err := r.db.ExecContext(ctx, `
+	_, err := r.db.ExecContext(ctx, `
         UPDATE threads
         SET worktree_path = ?, updated_at = CURRENT_TIMESTAMP
         WHERE id = ?
@@ -278,27 +278,28 @@ func (r *Repository) UpdateThreadWorktreePath(ctx context.Context, id int64, pat
 
 // UpdateThreadBranchName stores the git branch name for a thread.
 func (r *Repository) UpdateThreadBranchName(ctx context.Context, id int64, branch string) error {
-    _, err := r.db.ExecContext(ctx, `
+	_, err := r.db.ExecContext(ctx, `
         UPDATE threads
         SET branch_name = ?, updated_at = CURRENT_TIMESTAMP
         WHERE id = ?
     `, nullIfEmpty(branch), id)
-    if err != nil {
-        return fmt.Errorf("update thread branch name: %w", err)
-    }
-    return nil
+	if err != nil {
+		return fmt.Errorf("update thread branch name: %w", err)
+	}
+	return nil
 }
+
 // UpdateThreadPRURL stores the PR URL for a thread.
 func (r *Repository) UpdateThreadPRURL(ctx context.Context, id int64, url string) error {
-    _, err := r.db.ExecContext(ctx, `
+	_, err := r.db.ExecContext(ctx, `
         UPDATE threads
         SET pr_url = ?, updated_at = CURRENT_TIMESTAMP
         WHERE id = ?
     `, nullIfEmpty(url), id)
-    if err != nil {
-        return fmt.Errorf("update thread pr url: %w", err)
-    }
-    return nil
+	if err != nil {
+		return fmt.Errorf("update thread pr url: %w", err)
+	}
+	return nil
 }
 
 // DeleteThread removes a thread and cascades entries via foreign key constraints.
@@ -409,4 +410,64 @@ func (r *Repository) ListConversationEntries(ctx context.Context, threadID int64
 		return nil, fmt.Errorf("iterate conversation entries: %w", err)
 	}
 	return entries, nil
+}
+
+// ListConversationEntriesPage returns the most recent entries for a thread with cursor-based pagination.
+// Pass cursorID <= 0 to fetch the latest page. The next cursor, when present, represents the
+// oldest entry ID in the returned page and should be supplied to subsequent calls to fetch older entries.
+func (r *Repository) ListConversationEntriesPage(ctx context.Context, threadID int64, cursorID int64, limit int) ([]ConversationEntry, bool, error) {
+	if limit <= 0 {
+		limit = 20
+	}
+
+	query := `
+        SELECT id, thread_id, role, entry_type, payload, created_at, updated_at
+        FROM thread_entries
+        WHERE thread_id = ?`
+	args := []any{threadID}
+
+	if cursorID > 0 {
+		query += " AND id < ?"
+		args = append(args, cursorID)
+	}
+
+	query += " ORDER BY id DESC LIMIT ?"
+	args = append(args, limit+1)
+
+	rows, err := r.db.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, false, fmt.Errorf("query conversation page: %w", err)
+	}
+	defer rows.Close()
+
+	// rows are returned newest-first (highest id).
+	entriesDesc := make([]ConversationEntry, 0, limit+1)
+	for rows.Next() {
+		var (
+			entry   ConversationEntry
+			payload sql.NullString
+		)
+		if err := rows.Scan(&entry.ID, &entry.ThreadID, &entry.Role, &entry.EntryType, &payload, &entry.CreatedAt, &entry.UpdatedAt); err != nil {
+			return nil, false, fmt.Errorf("scan conversation page entry: %w", err)
+		}
+		if payload.Valid {
+			entry.Payload = json.RawMessage(payload.String)
+		}
+		entriesDesc = append(entriesDesc, entry)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, false, fmt.Errorf("iterate conversation page: %w", err)
+	}
+
+	hasMore := len(entriesDesc) > limit
+	if hasMore {
+		entriesDesc = entriesDesc[:limit]
+	}
+
+	// Reverse to chronological order (oldest -> newest) for consumers.
+	for i, j := 0, len(entriesDesc)-1; i < j; i, j = i+1, j-1 {
+		entriesDesc[i], entriesDesc[j] = entriesDesc[j], entriesDesc[i]
+	}
+
+	return entriesDesc, hasMore, nil
 }

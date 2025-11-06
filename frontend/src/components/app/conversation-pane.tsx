@@ -7,6 +7,10 @@ type ConversationPaneProps = {
   projectName: string
   thread: AgentThread | null
   entries: ConversationEntry[]
+  hasMore: boolean
+  isLoading: boolean
+  isFetchingMore: boolean
+  onLoadOlder: () => Promise<unknown> | void
   isStreaming: boolean
   streamStatus: string
 }
@@ -15,6 +19,10 @@ export function ConversationPane({
   projectName,
   thread,
   entries,
+  hasMore,
+  isLoading,
+  isFetchingMore,
+  onLoadOlder,
   isStreaming,
   streamStatus
 }: ConversationPaneProps) {
@@ -33,6 +41,10 @@ export function ConversationPane({
       <ConversationView
         projectName={projectName}
         entries={entries}
+        hasMore={hasMore}
+        isLoading={isLoading}
+        isFetchingMore={isFetchingMore}
+        onLoadOlder={onLoadOlder}
         isStreaming={isStreaming}
         streamStatus={streamStatus}
       />

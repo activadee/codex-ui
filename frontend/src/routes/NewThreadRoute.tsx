@@ -70,6 +70,10 @@ export default function NewThreadRoute() {
             projectName={workspace.projects.active?.name ?? "Workspace"}
             thread={null}
             entries={[]}
+            hasMore={false}
+            isLoading={false}
+            isFetchingMore={false}
+            onLoadOlder={() => {}}
             isStreaming={workspace.stream.isStreaming}
             streamStatus={workspace.stream.status}
           />

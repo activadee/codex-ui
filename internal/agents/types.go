@@ -152,6 +152,20 @@ type ConversationEntryDTO struct {
 	Meta      map[string]any    `json:"meta,omitempty"`
 }
 
+// ConversationPageRequest defines the payload for paginated transcript retrieval.
+type ConversationPageRequest struct {
+	ThreadID int64  `json:"threadId"`
+	Cursor   string `json:"cursor,omitempty"`
+	Limit    int    `json:"limit,omitempty"`
+}
+
+// ConversationPageDTO wraps a page of transcript entries and pagination metadata.
+type ConversationPageDTO struct {
+	Entries    []ConversationEntryDTO `json:"entries"`
+	NextCursor string                 `json:"nextCursor,omitempty"`
+	HasMore    bool                   `json:"hasMore"`
+}
+
 // ThreadDTO mirrors persisted thread data for the frontend.
 type ThreadDTO struct {
 	ID             int64           `json:"id"`

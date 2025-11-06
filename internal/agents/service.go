@@ -1,15 +1,15 @@
 package agents
 
 import (
-    "context"
-    "database/sql"
-    "errors"
-    "fmt"
-    "strings"
-    "sync"
+	"context"
+	"database/sql"
+	"errors"
+	"fmt"
+	"strings"
+	"sync"
 
-    gitc "codex-ui/internal/git/client"
-    "codex-ui/internal/git/worktrees"
+	gitc "codex-ui/internal/git/client"
+	"codex-ui/internal/git/worktrees"
 	"codex-ui/internal/storage/discovery"
 	"time"
 
@@ -38,8 +38,8 @@ type Service struct {
 	activeMu sync.Mutex
 	active   map[string]*activeStream
 
-    worktrees *worktrees.Manager
-    git       gitc.Client
+	worktrees *worktrees.Manager
+	git       gitc.Client
 	// cleanup controls
 	cleanupStop chan struct{}
 }
@@ -48,17 +48,17 @@ type Service struct {
 type ServiceOption func(*Service)
 
 func WithWorktreeManager(m *worktrees.Manager) ServiceOption {
-    return func(s *Service) { s.worktrees = m }
+	return func(s *Service) { s.worktrees = m }
 }
 func WithGitClient(gc gitc.Client) ServiceOption { return func(s *Service) { s.git = gc } }
 
 func NewService(defaultAgent string, repo *discovery.Repository, opts ...ServiceOption) *Service {
-    s := &Service{
-        adapters:     make(map[string]Adapter),
-        defaultAgent: defaultAgent,
-        repo:         repo,
-        active:       make(map[string]*activeStream),
-    }
+	s := &Service{
+		adapters:     make(map[string]Adapter),
+		defaultAgent: defaultAgent,
+		repo:         repo,
+		active:       make(map[string]*activeStream),
+	}
 	for _, opt := range opts {
 		if opt != nil {
 			opt(s)
@@ -441,49 +441,53 @@ func (s *Service) GetThread(ctx context.Context, id int64) (ThreadDTO, error) {
 
 // ListThreadDiffStats returns git diff statistics for a thread worktree.
 func (s *Service) ListThreadDiffStats(ctx context.Context, threadID int64) ([]FileDiffStatDTO, error) {
-    if err := s.ensureRepo(); err != nil {
-        return nil, err
-    }
-    thread, err := s.repo.GetThread(ctx, threadID)
-    if err != nil {
-        return nil, err
-    }
-    if strings.TrimSpace(thread.WorktreePath) == "" {
-        return nil, fmt.Errorf("thread %d has no worktree", threadID)
-    }
-    if s.git == nil {
-        return nil, fmt.Errorf("git client not initialised")
-    }
-    stats, err := s.git.DiffStats(ctx, thread.WorktreePath)
-    if err != nil { return nil, err }
-    out := make([]FileDiffStatDTO, 0, len(stats))
-    for _, st := range stats {
-        out = append(out, FileDiffStatDTO{Path: st.Path, Added: st.Added, Removed: st.Removed, Status: st.Status})
-    }
-    return out, nil
+	if err := s.ensureRepo(); err != nil {
+		return nil, err
+	}
+	thread, err := s.repo.GetThread(ctx, threadID)
+	if err != nil {
+		return nil, err
+	}
+	if strings.TrimSpace(thread.WorktreePath) == "" {
+		return nil, fmt.Errorf("thread %d has no worktree", threadID)
+	}
+	if s.git == nil {
+		return nil, fmt.Errorf("git client not initialised")
+	}
+	stats, err := s.git.DiffStats(ctx, thread.WorktreePath)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]FileDiffStatDTO, 0, len(stats))
+	for _, st := range stats {
+		out = append(out, FileDiffStatDTO{Path: st.Path, Added: st.Added, Removed: st.Removed, Status: st.Status})
+	}
+	return out, nil
 }
 
 func (s *Service) computeDiffSummary(ctx context.Context, worktreePath string) *DiffSummaryDTO {
-    if strings.TrimSpace(worktreePath) == "" {
-        return nil
-    }
-    // Guard against slow git calls blocking list/get requests
-    tctx, cancel := context.WithTimeout(ctx, 250*time.Millisecond)
-    defer cancel()
-    if s.git == nil { return nil }
-    stats, err := s.git.DiffStats(tctx, worktreePath)
-    if err != nil {
-        return nil
-    }
-    var added, removed int
-    for _, st := range stats {
-        added += st.Added
-        removed += st.Removed
-    }
-    if added == 0 && removed == 0 {
-        return nil
-    }
-    return &DiffSummaryDTO{Added: added, Removed: removed}
+	if strings.TrimSpace(worktreePath) == "" {
+		return nil
+	}
+	// Guard against slow git calls blocking list/get requests
+	tctx, cancel := context.WithTimeout(ctx, 250*time.Millisecond)
+	defer cancel()
+	if s.git == nil {
+		return nil
+	}
+	stats, err := s.git.DiffStats(tctx, worktreePath)
+	if err != nil {
+		return nil
+	}
+	var added, removed int
+	for _, st := range stats {
+		added += st.Added
+		removed += st.Removed
+	}
+	if added == 0 && removed == 0 {
+		return nil
+	}
+	return &DiffSummaryDTO{Added: added, Removed: removed}
 }
 
 // LoadThreadConversation returns the persisted transcript for a thread.
@@ -507,6 +511,42 @@ func (s *Service) LoadThreadConversation(ctx context.Context, threadID int64) ([
 		dtos = append(dtos, dto)
 	}
 	return dtos, nil
+}
+
+// LoadThreadConversationPage returns a paginated slice of conversation entries.
+// cursorID should be the numeric identifier of the oldest entry currently loaded; pass 0 for first page.
+func (s *Service) LoadThreadConversationPage(ctx context.Context, threadID int64, cursorID int64, limit int) (ConversationPageDTO, error) {
+	if err := s.ensureRepo(); err != nil {
+		return ConversationPageDTO{}, err
+	}
+	if _, err := s.repo.GetThread(ctx, threadID); err != nil {
+		return ConversationPageDTO{}, err
+	}
+	if limit <= 0 {
+		limit = 20
+	}
+	entries, hasMore, err := s.repo.ListConversationEntriesPage(ctx, threadID, cursorID, limit)
+	if err != nil {
+		return ConversationPageDTO{}, err
+	}
+	dtos := make([]ConversationEntryDTO, 0, len(entries))
+	for _, entry := range entries {
+		dto, convErr := conversationEntryToDTO(entry)
+		if convErr != nil {
+			return ConversationPageDTO{}, convErr
+		}
+		dtos = append(dtos, dto)
+	}
+
+	page := ConversationPageDTO{
+		Entries: dtos,
+		HasMore: hasMore,
+	}
+	if hasMore && len(entries) > 0 {
+		oldest := entries[0]
+		page.NextCursor = fmt.Sprintf("%d", oldest.ID)
+	}
+	return page, nil
 }
 
 // RenameThread updates the title of a thread and returns the refreshed record.
