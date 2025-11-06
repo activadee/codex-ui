@@ -1,18 +1,15 @@
 package agents
 
 import (
-	"context"
-	"database/sql"
-	"errors"
-	"fmt"
-	"os"
-	"path/filepath"
-	"regexp"
-	"strconv"
-	"strings"
-	"sync"
+    "context"
+    "database/sql"
+    "errors"
+    "fmt"
+    "strings"
+    "sync"
 
-	"codex-ui/internal/git/worktrees"
+    gitc "codex-ui/internal/git/client"
+    "codex-ui/internal/git/worktrees"
 	"codex-ui/internal/storage/discovery"
 	"time"
 
@@ -41,7 +38,8 @@ type Service struct {
 	activeMu sync.Mutex
 	active   map[string]*activeStream
 
-	worktrees *worktrees.Manager
+    worktrees *worktrees.Manager
+    git       gitc.Client
 	// cleanup controls
 	cleanupStop chan struct{}
 }
@@ -50,16 +48,17 @@ type Service struct {
 type ServiceOption func(*Service)
 
 func WithWorktreeManager(m *worktrees.Manager) ServiceOption {
-	return func(s *Service) { s.worktrees = m }
+    return func(s *Service) { s.worktrees = m }
 }
+func WithGitClient(gc gitc.Client) ServiceOption { return func(s *Service) { s.git = gc } }
 
 func NewService(defaultAgent string, repo *discovery.Repository, opts ...ServiceOption) *Service {
-	s := &Service{
-		adapters:     make(map[string]Adapter),
-		defaultAgent: defaultAgent,
-		repo:         repo,
-		active:       make(map[string]*activeStream),
-	}
+    s := &Service{
+        adapters:     make(map[string]Adapter),
+        defaultAgent: defaultAgent,
+        repo:         repo,
+        active:       make(map[string]*activeStream),
+    }
 	for _, opt := range opts {
 		if opt != nil {
 			opt(s)
@@ -442,39 +441,49 @@ func (s *Service) GetThread(ctx context.Context, id int64) (ThreadDTO, error) {
 
 // ListThreadDiffStats returns git diff statistics for a thread worktree.
 func (s *Service) ListThreadDiffStats(ctx context.Context, threadID int64) ([]FileDiffStatDTO, error) {
-	if err := s.ensureRepo(); err != nil {
-		return nil, err
-	}
-	thread, err := s.repo.GetThread(ctx, threadID)
-	if err != nil {
-		return nil, err
-	}
-	if strings.TrimSpace(thread.WorktreePath) == "" {
-		return nil, fmt.Errorf("thread %d has no worktree", threadID)
-	}
-	return collectGitDiffStats(ctx, thread.WorktreePath)
+    if err := s.ensureRepo(); err != nil {
+        return nil, err
+    }
+    thread, err := s.repo.GetThread(ctx, threadID)
+    if err != nil {
+        return nil, err
+    }
+    if strings.TrimSpace(thread.WorktreePath) == "" {
+        return nil, fmt.Errorf("thread %d has no worktree", threadID)
+    }
+    if s.git == nil {
+        return nil, fmt.Errorf("git client not initialised")
+    }
+    stats, err := s.git.DiffStats(ctx, thread.WorktreePath)
+    if err != nil { return nil, err }
+    out := make([]FileDiffStatDTO, 0, len(stats))
+    for _, st := range stats {
+        out = append(out, FileDiffStatDTO{Path: st.Path, Added: st.Added, Removed: st.Removed, Status: st.Status})
+    }
+    return out, nil
 }
 
 func (s *Service) computeDiffSummary(ctx context.Context, worktreePath string) *DiffSummaryDTO {
-	if strings.TrimSpace(worktreePath) == "" {
-		return nil
-	}
-	// Guard against slow git calls blocking list/get requests
-	tctx, cancel := context.WithTimeout(ctx, 250*time.Millisecond)
-	defer cancel()
-	stats, err := collectGitDiffStats(tctx, worktreePath)
-	if err != nil {
-		return nil
-	}
-	var added, removed int
-	for _, stat := range stats {
-		added += stat.Added
-		removed += stat.Removed
-	}
-	if added == 0 && removed == 0 {
-		return nil
-	}
-	return &DiffSummaryDTO{Added: added, Removed: removed}
+    if strings.TrimSpace(worktreePath) == "" {
+        return nil
+    }
+    // Guard against slow git calls blocking list/get requests
+    tctx, cancel := context.WithTimeout(ctx, 250*time.Millisecond)
+    defer cancel()
+    if s.git == nil { return nil }
+    stats, err := s.git.DiffStats(tctx, worktreePath)
+    if err != nil {
+        return nil
+    }
+    var added, removed int
+    for _, st := range stats {
+        added += st.Added
+        removed += st.Removed
+    }
+    if added == 0 && removed == 0 {
+        return nil
+    }
+    return &DiffSummaryDTO{Added: added, Removed: removed}
 }
 
 // LoadThreadConversation returns the persisted transcript for a thread.
@@ -548,112 +557,4 @@ func (s *Service) DeleteThread(ctx context.Context, id int64) error {
 	return nil
 }
 
-// StartWorktreeCleanup launches a periodic cleanup goroutine that removes
-// worktree directories whose threads no longer exist. Interval defaults to 1h
-// if zero or negative.
-func (s *Service) StartWorktreeCleanup(interval time.Duration) {
-	if s.worktrees == nil {
-		return
-	}
-	if interval <= 0 {
-		interval = time.Hour
-	}
-	if s.cleanupStop != nil {
-		return // already running
-	}
-	stop := make(chan struct{})
-	s.cleanupStop = stop
-	ticker := time.NewTicker(interval)
-	go func() {
-		defer ticker.Stop()
-		for {
-			select {
-			case <-ticker.C:
-				_ = s.cleanupOrphanWorktrees(context.Background())
-			case <-stop:
-				return
-			}
-		}
-	}()
-}
-
-// StopWorktreeCleanup stops the background cleanup worker if running.
-func (s *Service) StopWorktreeCleanup() {
-	if s.cleanupStop != nil {
-		close(s.cleanupStop)
-		s.cleanupStop = nil
-	}
-}
-
-func (s *Service) isThreadActive(threadID int64) bool {
-	s.activeMu.Lock()
-	defer s.activeMu.Unlock()
-	for _, a := range s.active {
-		if a.threadID == threadID {
-			return true
-		}
-	}
-	return false
-}
-
-func (s *Service) cleanupOrphanWorktrees(ctx context.Context) error {
-	root := strings.TrimSpace(s.worktrees.Root())
-	if root == "" {
-		return nil
-	}
-	projectDirs, err := os.ReadDir(root)
-	if err != nil {
-		return nil
-	}
-	for _, pd := range projectDirs {
-		if !pd.IsDir() {
-			continue
-		}
-		projectPath := filepath.Join(root, pd.Name())
-		threadDirs, err := os.ReadDir(projectPath)
-		if err != nil {
-			continue
-		}
-		for _, td := range threadDirs {
-			if !td.IsDir() {
-				continue
-			}
-			// parse id from either numeric-only or slugged (e.g. "feature-x-123") names
-			id, ok := parseThreadIDFromDir(td.Name())
-			if !ok || id <= 0 {
-				continue
-			}
-			if s.isThreadActive(id) {
-				continue
-			}
-			// Does thread exist?
-			if _, err := s.repo.GetThread(ctx, id); err != nil {
-				if errors.Is(err, sql.ErrNoRows) {
-					// orphan → remove worktree
-					_ = s.worktrees.RemoveForThread(ctx, filepath.Join(projectPath, td.Name()))
-				}
-			}
-		}
-	}
-	return nil
-}
-
-var trailingDigits = regexp.MustCompile(`(\d+)$`)
-
-// parseThreadIDFromDir extracts the numeric thread ID from a directory name.
-// Accepts both "123" and slugged names ending with "-<id>".
-func parseThreadIDFromDir(name string) (int64, bool) {
-	trimmed := strings.TrimSpace(name)
-	if trimmed == "" {
-		return 0, false
-	}
-	if id, err := strconv.ParseInt(trimmed, 10, 64); err == nil {
-		return id, true
-	}
-	if m := trailingDigits.FindStringSubmatch(trimmed); len(m) == 2 {
-		if id, err := strconv.ParseInt(m[1], 10, 64); err == nil {
-			return id, true
-		}
-	}
-	return 0, false
-}
+// cleanup-related methods moved to cleanup.go
