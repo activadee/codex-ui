@@ -1,7 +1,5 @@
-import { useMemo } from "react"
-
 import { DeleteAttachment } from "../../../wailsjs/go/attachments/API"
-import { useAgentStream } from "@/hooks/useAgentStream"
+import { useAgentStream, type AgentStreamState } from "@/hooks/useAgentStream"
 import { threadToListItem } from "@/lib/threads"
 import type {
   AgentItemPayload,
@@ -44,7 +42,7 @@ export function useStreamLifecycle(options: StreamLifecycleOptions) {
     pendingAttachmentsRef
   } = options
 
-  const { startStream, cancelStream, getThreadState } = useAgentStream({
+  const { startStream, cancelStream, state: streamState } = useAgentStream({
     threadId: activeThreadId ?? undefined,
     onEvent: (event, context) => {
       const targetThreadId = context.threadId ?? activeThreadId ?? undefined
@@ -126,12 +124,9 @@ export function useStreamLifecycle(options: StreamLifecycleOptions) {
     }
   })
 
-  const threadStreamState = useMemo(() => getThreadState(activeThreadId ?? undefined), [activeThreadId, getThreadState])
-
   return {
     startStream,
     cancelStream,
-    threadStreamState,
-    getThreadState
+    streamState
   }
 }

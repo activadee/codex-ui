@@ -57,9 +57,17 @@ export function useWorkspaceController() {
     pendingAttachmentsRef
   })
 
-  const { startStream, cancelStream, threadStreamState, getThreadState } = streamLifecycle
-  const idleStreamState = { status: "idle", error: null } as ReturnType<typeof getThreadState>
-  const activeThreadStreamState = threadId ? threadStreamState : idleStreamState
+  const { startStream, cancelStream, streamState } = streamLifecycle
+  const isActiveThread = streamState.threadId === threadId
+  const activeThreadStreamState = isActiveThread
+    ? streamState
+    : {
+        threadId,
+        streamId: undefined,
+        status: "idle" as const,
+        usage: undefined,
+        error: null
+      }
   const isThreadStreaming = activeThreadStreamState.status === "streaming"
 
   useEffect(() => {
