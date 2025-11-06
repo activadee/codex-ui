@@ -1,21 +1,24 @@
 package projects
 
 import (
-	"context"
-	"database/sql"
-	"errors"
-	"fmt"
-	"time"
+    "context"
+    "database/sql"
+    "errors"
+    "fmt"
+    "time"
 
-	"codex-ui/internal/storage/discovery"
+    "codex-ui/internal/logging"
+    "codex-ui/internal/storage/discovery"
 )
 
 type Service struct {
-	repo *discovery.Repository
+    repo   *discovery.Repository
+    logger logging.Logger
 }
 
-func NewService(repo *discovery.Repository) *Service {
-	return &Service{repo: repo}
+func NewService(repo *discovery.Repository, logger logging.Logger) *Service {
+    if logger == nil { logger = logging.Nop() }
+    return &Service{repo: repo, logger: logger}
 }
 
 type ProjectDTO struct {
