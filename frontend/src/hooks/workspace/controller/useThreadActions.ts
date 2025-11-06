@@ -2,16 +2,16 @@ import { useCallback, type Dispatch, type SetStateAction } from "react"
 import { useQueryClient } from "@tanstack/react-query"
 
 import { DeleteThread, RenameThread } from "../../../../wailsjs/go/agents/API"
-import { mapThreadDtoToThread, threadToListItem } from "@/lib/threads"
+import { mapThreadDtoToThread } from "@/lib/threads"
 import type { AgentThread, ThreadListItem } from "@/types/app"
 
 type ThreadActionsDependencies = {
   setThreads: (updater: (prev: AgentThread[]) => AgentThread[]) => void
-  setActiveThread: Dispatch<SetStateAction<ThreadListItem | null>>
+  setActiveThreadId: Dispatch<SetStateAction<number | null>>
   updateStreamError: (message: string | null, threadId?: number) => void
 }
 
-export function useThreadActions({ setThreads, setActiveThread, updateStreamError }: ThreadActionsDependencies) {
+export function useThreadActions({ setThreads, setActiveThreadId, updateStreamError }: ThreadActionsDependencies) {
   const queryClient = useQueryClient()
 
   const renameThread = useCallback(
@@ -33,14 +33,8 @@ export function useThreadActions({ setThreads, setActiveThread, updateStreamErro
           return next
         })
       )
-      setActiveThread((prev) => {
-        if (!updatedThread || !prev || prev.id !== updatedThread.id) {
-          return prev
-        }
-        return threadToListItem(updatedThread)
-      })
     },
-    [setActiveThread, setThreads]
+    [setThreads]
   )
 
   const deleteThread = useCallback(
@@ -48,15 +42,10 @@ export function useThreadActions({ setThreads, setActiveThread, updateStreamErro
       await DeleteThread(thread.id)
       setThreads((prev) => prev.filter((existing) => existing.id !== thread.id))
       queryClient.removeQueries({ queryKey: ["conversation", thread.id] })
-      setActiveThread((prev) => {
-        if (prev?.id === thread.id) {
-          return null
-        }
-        return prev
-      })
+      setActiveThreadId((prev) => (prev === thread.id ? null : prev))
       updateStreamError(null, thread.id)
     },
-    [queryClient, setActiveThread, setThreads, updateStreamError]
+    [queryClient, setActiveThreadId, setThreads, updateStreamError]
   )
 
   return {

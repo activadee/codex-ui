@@ -83,30 +83,32 @@ export function useWorkspaceRouting(
       return
     }
 
+    const currentThreadId = workspace.selection.threadId
+
     if (isNewThreadRoute) {
-      workspace.threads.newThread()
+      if (currentThreadId !== null) {
+        workspace.threads.newThread()
+      }
       return
     }
 
     if (threadIdParam && !Number.isNaN(threadIdParam)) {
-      const target = workspace.threads.list.find((thread) => thread.id === threadIdParam)
-      if (target) {
-        if (!workspace.threads.active || workspace.threads.active.id !== target.id) {
+      if (currentThreadId !== threadIdParam) {
+        const target = workspace.threads.list.find((thread) => thread.id === threadIdParam)
+        if (target) {
           workspace.threads.select(threadToListItem(target))
+          return
         }
-        return
+        navigate(`/projects/${activeProject.id}`, { replace: true })
       }
-      navigate(`/projects/${activeProject.id}`, { replace: true })
       return
     }
 
-    // Only drive thread navigation when URL's project matches active project.
     if (
       (projectIdParam === null || projectIdParam === activeProject.id) &&
-      workspace.threads.active &&
-      workspace.threads.active.projectId === activeProject.id
+      currentThreadId !== null
     ) {
-      const target = `/projects/${activeProject.id}/threads/${workspace.threads.active.id}`
+      const target = `/projects/${activeProject.id}/threads/${currentThreadId}`
       if (location.pathname !== target) {
         navigate(target, { replace: true })
       }
@@ -118,9 +120,10 @@ export function useWorkspaceRouting(
     location.pathname,
     workspace.projects.active?.id,
     workspace.projects.isLoading,
-    workspace.threads.active?.id,
     workspace.threads.isLoading,
-    workspace.threads.list
+    workspace.threads.list,
+    workspace.selection.threadId,
+    projectIdParam
   ])
 
   useEffect(() => {

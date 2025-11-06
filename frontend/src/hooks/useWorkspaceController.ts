@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import { useQueryClient } from "@tanstack/react-query"
 
 import type {
@@ -15,7 +15,6 @@ import { agents } from "../../wailsjs/go/models"
 import { useProjects } from "@/hooks/useProjects"
 import { useAgentThreads } from "@/hooks/useAgentThreads"
 import { useThreadConversation } from "@/hooks/useThreadConversation"
-import { useThreadSelection } from "@/hooks/workspace/useThreadSelection"
 import { useAgentStream } from "@/hooks/useAgentStream"
 import { usePendingAttachments } from "@/hooks/workspace/controller/usePendingAttachments"
 import { useStreamErrors } from "@/hooks/workspace/controller/useStreamErrors"
@@ -204,13 +203,38 @@ export function useWorkspaceController() {
     [applyPreviewFromEntries, getConversationEntries]
   )
 
-  const { activeThread, setActiveThread, threadId, selectedThread, handleThreadSelect } = useThreadSelection(threads)
-  const { entries: conversationEntries } = useThreadConversation(threadId)
+  const [activeThreadId, setActiveThreadId] = useState<number | null>(null)
+
+  useEffect(() => {
+    setActiveThreadId((prev) => {
+      if (threads.length === 0) {
+        return null
+      }
+      if (prev && threads.some((thread) => thread.id === prev)) {
+        return prev
+      }
+      return threads[0].id
+    })
+  }, [threads])
+
+  const selectedThread = useMemo(() => {
+    if (!activeThreadId) {
+      return null
+    }
+    return threads.find((thread) => thread.id === activeThreadId) ?? null
+  }, [threads, activeThreadId])
+
+  const activeThreadListItem = useMemo(
+    () => (selectedThread ? threadToListItem(selectedThread) : null),
+    [selectedThread]
+  )
+
+  const { entries: conversationEntries } = useThreadConversation(activeThreadId)
 
   const { startStream, cancelStream, state: streamState } = useAgentStream({
-    threadId: threadId ?? undefined,
+    threadId: activeThreadId ?? undefined,
     onEvent: (event, context) => {
-      const targetThreadId = context.threadId ?? threadId ?? undefined
+      const targetThreadId = context.threadId ?? activeThreadId ?? undefined
       if (!targetThreadId) {
         return
       }
@@ -270,7 +294,7 @@ export function useWorkspaceController() {
       updateStreamError(null, threadIdFromStream)
       const record = await refreshThread(threadIdFromStream)
       const listItem = threadToListItem(record)
-      setActiveThread(listItem)
+      setActiveThreadId(listItem.id)
 
       syncThreadPreviewFromConversation(threadIdFromStream)
 
@@ -288,11 +312,11 @@ export function useWorkspaceController() {
       updateStreamError(message, context.threadId)
     }
   })
-  const isActiveThread = streamState.threadId === threadId
+  const isActiveThread = streamState.threadId === activeThreadId
   const activeThreadStreamState = isActiveThread
     ? streamState
     : {
-        threadId,
+        threadId: activeThreadId,
         streamId: undefined,
         status: "idle" as const,
         usage: undefined,
@@ -301,23 +325,27 @@ export function useWorkspaceController() {
   const isThreadStreaming = activeThreadStreamState.status === "streaming"
 
   useEffect(() => {
-    if (!threadId) {
+    if (!activeThreadId) {
       return
     }
-    ensureTimeline(threadId)
-  }, [ensureTimeline, threadId])
+    ensureTimeline(activeThreadId)
+  }, [ensureTimeline, activeThreadId])
 
   useEffect(() => {
-    if (!threadId) {
+    if (!activeThreadId) {
       return
     }
-    void queryClient.ensureQueryData({ queryKey: ["conversation", threadId] })
-  }, [queryClient, threadId])
+    void queryClient.ensureQueryData({ queryKey: ["conversation", activeThreadId] })
+  }, [queryClient, activeThreadId])
 
   const handleNewThread = useCallback(() => {
-    setActiveThread(null)
+    setActiveThreadId(null)
     updateStreamError(null)
   }, [updateStreamError])
+
+  const handleThreadSelect = useCallback((thread: ThreadListItem) => {
+    setActiveThreadId(thread.id)
+  }, [])
 
   const sendMessage = useCallback(
     async ({ content, model, sandbox, reasoning, segments, attachmentPaths }: SendMessageOptions) => {
@@ -352,14 +380,14 @@ export function useWorkspaceController() {
         return undefined
       }
 
-      updateStreamError(null, activeThread?.id ?? undefined)
+      updateStreamError(null, activeThreadId ?? undefined)
 
-      const existingThread = activeThread ? threads.find((thread) => thread.id === activeThread.id) : undefined
+      const existingThread = selectedThread
 
       const request = agents.MessageRequest.createFrom({
         agentId: "codex",
         projectId: activeProject.id,
-        threadId: activeThread?.id ?? 0,
+        threadId: activeThreadId ?? 0,
         threadExternalId: existingThread?.externalId,
         input: hasSegments ? "" : trimmed,
         segments: hasSegments ? normalizedSegments : undefined,
@@ -387,46 +415,46 @@ export function useWorkspaceController() {
 
       const record = await refreshThread(handle.threadId)
       const listItem = threadToListItem(record)
-      setActiveThread(listItem)
+      setActiveThreadId(listItem.id)
       syncThreadPreviewFromConversation(handle.threadId)
       return handle.threadId
     },
     [
       activeProject,
-      activeThread,
       appendUserEntry,
       ensureTimeline,
       refreshThread,
       registerPendingAttachments,
-      setActiveThread,
       startStream,
       syncThreadPreviewFromConversation,
-      threads,
-      updateStreamError
+      updateStreamError,
+      activeThreadId,
+      selectedThread,
+      setActiveThreadId
     ]
   )
 
   const { renameThread, deleteThread } = useThreadActions({
     setThreads,
-    setActiveThread,
+    setActiveThreadId,
     updateStreamError
   })
 
   const streamStatus = activeThreadStreamState.status
   const streamUsage = activeThreadStreamState.usage
   const stateError = activeThreadStreamState.error ?? null
-  const manualThreadError = threadId ? getErrorForThread(threadId) : null
+  const manualThreadError = activeThreadId ? getErrorForThread(activeThreadId) : null
   const globalError = getErrorForThread()
   const activeStreamError = manualThreadError ?? stateError ?? globalError ?? null
 
   const setCurrentStreamError = useCallback(
     (message: string | null) => {
-      updateStreamError(message, threadId ?? undefined)
+      updateStreamError(message, activeThreadId ?? undefined)
     },
-    [threadId, updateStreamError]
+    [activeThreadId, updateStreamError]
   )
 
-  const cancelCurrentStream = useCallback(() => cancelStream(threadId ?? undefined), [cancelStream, threadId])
+  const cancelCurrentStream = useCallback(() => cancelStream(activeThreadId ?? undefined), [cancelStream, activeThreadId])
 
   return {
     projects: {
@@ -443,7 +471,7 @@ export function useWorkspaceController() {
       sections,
       isLoading: threadsLoading,
       error: threadsError,
-      active: activeThread,
+      active: activeThreadListItem,
       select: handleThreadSelect,
       newThread: handleNewThread,
       rename: renameThread,
@@ -462,7 +490,8 @@ export function useWorkspaceController() {
       cancel: cancelCurrentStream
     },
     selection: {
-      thread: selectedThread
+      thread: selectedThread,
+      threadId: activeThreadId
     }
   }
 }
