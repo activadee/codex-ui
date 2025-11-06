@@ -55,7 +55,9 @@ func (a *API) SaveClipboardImage(dataBase64 string, mimeType string) (string, er
     target := filepath.Join(dir, filename)
     if err := os.WriteFile(target, bytes, 0o600); err != nil { return "", fmt.Errorf("write image: %w", err) }
     abs, err := filepath.Abs(target); if err != nil { return "", fmt.Errorf("resolve image path: %w", err) }
-    if a.log != nil { a.log.Info("attachment saved", "path", abs, "mime", mediaType) }
+    // Log only relative filename to avoid leaking absolute paths
+    file := filepath.Base(abs)
+    if a.log != nil { a.log.Info("attachment saved", "file", file, "mime", mediaType) }
     return abs, nil
 }
 
@@ -69,7 +71,7 @@ func (a *API) DeleteAttachment(path string) error {
     rel, err := filepath.Rel(rootAbs, target); if err != nil { return fmt.Errorf("resolve relative: %w", err) }
     if rel=="." || rel=="" || rel==".." || strings.HasPrefix(rel, ".."+string(os.PathSeparator)) { return fmt.Errorf("attachment path outside managed directory") }
     if err := os.Remove(target); err != nil { return fmt.Errorf("delete attachment: %w", err) }
-    if a.log != nil { a.log.Info("attachment deleted", "path", target) }
+    if a.log != nil { a.log.Info("attachment deleted", "file", filepath.Base(target)) }
     return nil
 }
 

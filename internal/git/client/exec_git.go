@@ -34,10 +34,8 @@ func (c *ExecClient) DiffStats(ctx context.Context, root string) ([]FileDiffStat
 
     numstat := make(map[string][2]int)
     if err := c.accumulateNumstat(ctx, root, []string{"diff", "--numstat", "HEAD"}, numstat); err != nil {
-        emptyTreeHash, hashErr := c.r.Run(ctx, root, "hash-object", "-w", "-t", "tree", "/dev/null")
-        if hashErr != nil { return nil, fmt.Errorf("resolve empty tree hash: %w", hashErr) }
-        emptyTreeHash = strings.TrimSpace(emptyTreeHash)
-        if emptyTreeHash == "" { return nil, fmt.Errorf("resolve empty tree hash: %w", err) }
+        // Use the well-known empty tree hash to avoid writes
+        const emptyTreeHash = "4b825dc642cb6eb9a060e54bf8d69288fbee4904"
         if err := c.accumulateNumstat(ctx, root, []string{"diff", "--numstat", emptyTreeHash}, numstat); err != nil { return nil, err }
     }
     if err := c.accumulateNumstat(ctx, root, []string{"diff", "--numstat", "--cached"}, numstat); err != nil { return nil, err }
