@@ -74,7 +74,7 @@ export function useThreadConversation(threadId: number | null) {
       const response = await LoadThreadConversation(threadId)
       return normaliseConversation(response)
     },
-    staleTime: 5_000,
+    staleTime: Number.POSITIVE_INFINITY,
     gcTime: 120_000
   })
 

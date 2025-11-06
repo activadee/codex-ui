@@ -11,10 +11,11 @@ import type {
   UserMessageSegment
 } from "@/types/app"
 import { DeleteAttachment } from "../../wailsjs/go/attachments/API"
+import { LoadThreadConversation } from "../../wailsjs/go/agents/API"
 import { agents } from "../../wailsjs/go/models"
 import { useProjects } from "@/hooks/useProjects"
 import { useAgentThreads } from "@/hooks/useAgentThreads"
-import { useThreadConversation } from "@/hooks/useThreadConversation"
+import { useThreadConversation, normaliseConversation } from "@/hooks/useThreadConversation"
 import { useAgentStream } from "@/hooks/useAgentStream"
 import { usePendingAttachments } from "@/hooks/workspace/controller/usePendingAttachments"
 import { useStreamErrors } from "@/hooks/workspace/controller/useStreamErrors"
@@ -203,19 +204,44 @@ export function useWorkspaceController() {
     [applyPreviewFromEntries, getConversationEntries]
   )
 
+  const prefetchConversation = useCallback(
+    async (threadId: number | null) => {
+      if (!threadId || threadId <= 0) {
+        return
+      }
+      try {
+        await queryClient.ensureQueryData({
+          queryKey: ["conversation", threadId],
+          queryFn: async () => {
+            const response = await LoadThreadConversation(threadId)
+            return normaliseConversation(response)
+          },
+          staleTime: Number.POSITIVE_INFINITY,
+          gcTime: 120_000
+        })
+      } catch (error) {
+        console.error("Failed to prefetch conversation", error)
+      }
+    },
+    [queryClient]
+  )
+
   const [activeThreadId, setActiveThreadId] = useState<number | null>(null)
 
   useEffect(() => {
-    setActiveThreadId((prev) => {
-      if (threads.length === 0) {
-        return null
+    if (threads.length === 0) {
+      if (activeThreadId !== null) {
+        setActiveThreadId(null)
       }
-      if (prev && threads.some((thread) => thread.id === prev)) {
-        return prev
-      }
-      return threads[0].id
-    })
-  }, [threads])
+      return
+    }
+    if (activeThreadId && threads.some((thread) => thread.id === activeThreadId)) {
+      return
+    }
+    const nextId = threads[0].id
+    setActiveThreadId(nextId)
+    void prefetchConversation(nextId)
+  }, [threads, activeThreadId, prefetchConversation])
 
   const selectedThread = useMemo(() => {
     if (!activeThreadId) {
@@ -344,8 +370,9 @@ export function useWorkspaceController() {
   }, [updateStreamError])
 
   const handleThreadSelect = useCallback((thread: ThreadListItem) => {
+    void prefetchConversation(thread.id)
     setActiveThreadId(thread.id)
-  }, [])
+  }, [prefetchConversation])
 
   const sendMessage = useCallback(
     async ({ content, model, sandbox, reasoning, segments, attachmentPaths }: SendMessageOptions) => {
