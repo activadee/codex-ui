@@ -60,7 +60,10 @@ export function ConversationView({
         virtuosoRef.current.scrollToIndex({ index: delta, align: "start", behavior: "auto" })
       }
     } else if (prevLengthRef.current === 0 && entries.length > 0 && virtuosoRef.current) {
-      virtuosoRef.current.scrollToIndex({ index: entries.length - 1, align: "end", behavior: "auto" })
+      const targetIndex = entries.length - 1
+      requestAnimationFrame(() => {
+        virtuosoRef.current?.scrollToIndex({ index: targetIndex, align: "end", behavior: "auto" })
+      })
     }
     prevLengthRef.current = entries.length
     wasFetchingMoreRef.current = isFetchingMore
