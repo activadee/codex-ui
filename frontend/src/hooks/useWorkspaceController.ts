@@ -1,4 +1,5 @@
 import { useCallback, useEffect } from "react"
+import { useQueryClient } from "@tanstack/react-query"
 
 import type { ThreadListItem } from "@/types/app"
 import { useProjects } from "@/hooks/useProjects"
@@ -13,6 +14,7 @@ import { useMessageSender } from "@/hooks/workspace/controller/useMessageSender"
 import { useThreadActions } from "@/hooks/workspace/controller/useThreadActions"
 
 export function useWorkspaceController() {
+  const queryClient = useQueryClient()
   const {
     projects,
     activeProject,
@@ -66,6 +68,13 @@ export function useWorkspaceController() {
     }
     ensureTimeline(threadId)
   }, [ensureTimeline, threadId])
+
+  useEffect(() => {
+    if (!threadId) {
+      return
+    }
+    void queryClient.ensureQueryData({ queryKey: ["conversation", threadId] })
+  }, [queryClient, threadId])
 
   const handleNewThread = useCallback(() => {
     setActiveThread(null)
