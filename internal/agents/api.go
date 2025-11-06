@@ -5,6 +5,7 @@ import (
     "fmt"
     "strings"
 
+    "codex-ui/internal/git/worktrees"
     "codex-ui/internal/storage/discovery"
     "codex-ui/internal/watchers"
     "codex-ui/internal/logging"
@@ -120,14 +121,21 @@ func (a *API) CreatePullRequest(threadID int64) (string, error) {
 	if worktree == "" {
 		return "", fmt.Errorf("thread %d has no worktree", threadID)
 	}
-	diffs, err := a.svc.ListThreadDiffStats(context.Background(), threadID)
-	if err != nil {
-		return "", err
-	}
-	if len(diffs) == 0 {
-		return "", fmt.Errorf("no file changes detected")
-	}
-    instruction := BuildCreatePRInstruction(thread.BranchName)
+    diffs, err := a.svc.ListThreadDiffStats(context.Background(), threadID)
+    if err != nil {
+        return "", err
+    }
+    if len(diffs) == 0 {
+        return "", fmt.Errorf("no file changes detected")
+    }
+    // Resolve branch name with fallback and persist if missing
+    branch := strings.TrimSpace(thread.BranchName)
+    if branch == "" {
+        branch = worktrees.BranchName(thread.Title, thread.ID)
+        // best-effort persist before running the PR job
+        _ = a.repo.UpdateThreadBranchName(context.Background(), thread.ID, branch)
+    }
+    instruction := BuildCreatePRInstruction(branch)
     stream, err := StartBackgroundPRStream(worktree, "danger-full-access", instruction)
 	if err != nil {
 		return "", err
