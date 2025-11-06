@@ -47,10 +47,9 @@ export function ConversationPane({
         isLoading={isLoading}
         isFetchingMore={isFetchingMore}
         onLoadOlder={onLoadOlder}
-        threadId={threadId}
         isStreaming={isStreaming}
         streamStatus={streamStatus}
-        threadId={thread?.id}
+        threadId={threadId}
       />
     </WorkspacePanel>
   )
