@@ -1,6 +1,6 @@
 import { Loader2, Sparkles } from "lucide-react"
-import { Virtuoso } from "react-virtuoso"
-import { useCallback, useMemo } from "react"
+import { Virtuoso, type VirtuosoHandle } from "react-virtuoso"
+import { useCallback, useEffect, useMemo, useRef } from "react"
 
 import type { ConversationEntry } from "@/types/app"
 
@@ -48,14 +48,36 @@ export function ConversationView({
     )
   }
 
-  const handleStartReached = useCallback(() => {
-    if (!hasMore || isFetchingMore) {
-      return
+  const virtuosoRef = useRef<VirtuosoHandle | null>(null)
+  const lastTopStateRef = useRef(false)
+  const prevLengthRef = useRef(entries.length)
+  const wasFetchingMoreRef = useRef(isFetchingMore)
+
+  useEffect(() => {
+    if (wasFetchingMoreRef.current && !isFetchingMore) {
+      const delta = entries.length - prevLengthRef.current
+      if (delta > 0 && virtuosoRef.current) {
+        virtuosoRef.current.scrollToIndex({ index: delta, align: "start", behavior: "auto" })
+      }
+    } else if (prevLengthRef.current === 0 && entries.length > 0 && virtuosoRef.current) {
+      virtuosoRef.current.scrollToIndex({ index: entries.length - 1, align: "end", behavior: "auto" })
     }
-    if (onLoadOlder) {
-      void onLoadOlder()
-    }
-  }, [hasMore, isFetchingMore, onLoadOlder])
+    prevLengthRef.current = entries.length
+    wasFetchingMoreRef.current = isFetchingMore
+  }, [entries.length, isFetchingMore])
+
+  const handleTopStateChange = useCallback(
+    (atTop: boolean) => {
+      if (atTop && !lastTopStateRef.current && hasMore && !isFetchingMore && !isLoading) {
+        const result = onLoadOlder?.()
+        if (result && typeof (result as Promise<unknown>).then === "function") {
+          void (result as Promise<unknown>)
+        }
+      }
+      lastTopStateRef.current = atTop
+    },
+    [hasMore, isFetchingMore, isLoading, onLoadOlder]
+  )
 
   const components = useMemo(
     () => ({
@@ -80,11 +102,12 @@ export function ConversationView({
     <div className="flex min-w-0 flex-1 min-h-0 overflow-hidden bg-white">
       <div className="flex min-w-0 flex-1 min-h-0 flex-col">
         <Virtuoso
+          ref={virtuosoRef}
           style={{ height: "100%" }}
           data={entries}
           overscan={200}
-          followOutput="auto"
-          startReached={handleStartReached}
+          followOutput={isStreaming ? "smooth" : false}
+          atTopStateChange={handleTopStateChange}
           computeItemKey={(index, entry) => entry.id}
           components={components}
           itemContent={(index, entry) => (

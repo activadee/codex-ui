@@ -71,7 +71,7 @@ export default function ThreadRoute() {
                 hasMore={conversation.hasMore}
                 isLoading={conversation.isFetching}
                 isFetchingMore={conversation.isFetchingMore}
-                onLoadOlder={() => conversation.fetchOlder?.()}
+                onLoadOlder={conversation.fetchOlder}
                 isStreaming={stream.isStreaming}
                 streamStatus={stream.status}
               />

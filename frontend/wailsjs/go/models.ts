@@ -243,40 +243,24 @@ export namespace agents {
 		        return new classs(a);
 		    }
 		    return a;
-	}
-	}
-	export class ConversationPageRequest {
-	    threadId: number;
-	    cursor?: string;
-	    limit?: number;
-
-	    static createFrom(source: any = {}) {
-	        return new ConversationPageRequest(source);
-	    }
-
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.threadId = source["threadId"];
-	        this.cursor = source["cursor"];
-	        this.limit = source["limit"];
-	    }
+		}
 	}
 	export class ConversationPageDTO {
 	    entries: ConversationEntryDTO[];
 	    nextCursor?: string;
 	    hasMore: boolean;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new ConversationPageDTO(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.entries = this.convertValues(source["entries"], ConversationEntryDTO);
 	        this.nextCursor = source["nextCursor"];
 	        this.hasMore = source["hasMore"];
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -294,6 +278,22 @@ export namespace agents {
 		    }
 		    return a;
 		}
+	}
+	export class ConversationPageRequest {
+	    threadId: number;
+	    cursor?: string;
+	    limit?: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new ConversationPageRequest(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.threadId = source["threadId"];
+	        this.cursor = source["cursor"];
+	        this.limit = source["limit"];
+	    }
 	}
 	export class DiffSummaryDTO {
 	    added: number;
@@ -553,3 +553,4 @@ export namespace terminal {
 	}
 
 }
+

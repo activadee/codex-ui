@@ -10,7 +10,7 @@ type ConversationPaneProps = {
   hasMore: boolean
   isLoading: boolean
   isFetchingMore: boolean
-  onLoadOlder: () => Promise<unknown> | void
+  onLoadOlder?: () => Promise<unknown> | void
   isStreaming: boolean
   streamStatus: string
 }
