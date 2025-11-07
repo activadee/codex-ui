@@ -10,8 +10,6 @@ type StreamStatus = "idle" | "streaming" | "completed" | "stopped" | "error"
 type StreamContext = { threadId?: number; streamId?: string }
 
 type UseAgentStreamOptions = {
-  threadId?: number
-  onEvent?: (event: StreamEventPayload, context: StreamContext) => void
   onComplete?: (threadId: number, status: string, streamId?: string) => void
   onError?: (message: string, context: StreamContext) => void
 }
@@ -30,39 +28,23 @@ const idleState: AgentStreamState = {
 }
 
 export function useAgentStream(options: UseAgentStreamOptions = {}) {
-  const [streamState, setStreamState] = useState<AgentStreamState>(idleState)
-  const [listeningThreadId, setListeningThreadId] = useState<number | undefined>(options.threadId)
+  const [threadStates, setThreadStates] = useState<Record<number, AgentStreamState>>({})
+  const threadStatesRef = useRef<Record<number, AgentStreamState>>({})
   const optionsRef = useRef(options)
   const router = useThreadEventRouter()
-  const streamThreadRef = useRef<number | undefined>(undefined)
-  const streamIdRef = useRef<string | undefined>(undefined)
 
   useEffect(() => {
     optionsRef.current = options
   }, [options])
 
-  useEffect(() => {
-    if (options.threadId === undefined) {
-      if (!streamThreadRef.current) {
-        setListeningThreadId(undefined)
-      }
-    } else {
-      setListeningThreadId(options.threadId)
-    }
-  }, [options.threadId])
-
-  const updateState = useCallback((updater: (prev: AgentStreamState) => AgentStreamState) => {
-    setStreamState((prev) => updater(prev))
-  }, [])
-
-  const clearStreamRefs = useCallback(() => {
-    streamThreadRef.current = undefined
-    streamIdRef.current = undefined
-    if (optionsRef.current.threadId === undefined) {
-      setListeningThreadId(undefined)
-    } else {
-      setListeningThreadId(optionsRef.current.threadId)
-    }
+  const updateThreadState = useCallback((threadId: number, updater: (prev: AgentStreamState) => AgentStreamState) => {
+    setThreadStates((prev) => {
+      const current = prev[threadId] ?? idleState
+      const next = updater({ ...current, threadId })
+      const updated = { ...prev, [threadId]: next }
+      threadStatesRef.current = updated
+      return updated
+    })
   }, [])
 
   const handleStreamEvent = useCallback(
@@ -72,117 +54,101 @@ export function useAgentStream(options: UseAgentStreamOptions = {}) {
         return
       }
 
-      streamThreadRef.current = threadId
-      streamIdRef.current = streamId
-
-      optionsRef.current.onEvent?.(event, context)
-
       if (event.usage) {
-        updateState((prev) => ({ ...prev, threadId, usage: event.usage }))
+        updateThreadState(threadId, (prev) => ({ ...prev, streamId, usage: event.usage }))
       }
 
       if (event.error?.message) {
         const message = event.error.message
-        updateState((prev) => ({ ...prev, threadId, status: "error", error: message }))
+        updateThreadState(threadId, (prev) => ({ ...prev, streamId, status: "error", error: message }))
         optionsRef.current.onError?.(message, context)
       }
 
       if (event.type === "stream.complete" || event.type === "stream.error") {
         const status: StreamStatus = event.type === "stream.complete" ? "completed" : "error"
-        updateState((prev) => ({
+        updateThreadState(threadId, (prev) => ({
           ...prev,
-          threadId,
+          streamId: undefined,
           status,
-          error: event.error?.message ?? prev.error ?? null,
-          streamId: undefined
+          error: event.error?.message ?? prev.error ?? null
         }))
         optionsRef.current.onComplete?.(threadId, event.message ?? status, streamId)
-        clearStreamRefs()
       }
     },
-    [clearStreamRefs, updateState]
+    [updateThreadState]
   )
 
-  useEffect(() => {
-    if (!listeningThreadId) {
-      return
-    }
-    return router.subscribeToStream(listeningThreadId, handleStreamEvent)
-  }, [router, handleStreamEvent, listeningThreadId])
+  useEffect(() => router.subscribeToStream(undefined, handleStreamEvent), [router, handleStreamEvent])
 
   const startStream = useCallback(
     async (payload: agents.MessageRequest) => {
-      if (streamIdRef.current) {
-        throw new Error("A stream is already running")
-      }
-
       const handle = await Send(payload)
       router.registerStream(handle)
-      streamThreadRef.current = handle.threadId
-      streamIdRef.current = handle.streamId
-      setListeningThreadId(handle.threadId)
-      setStreamState({
+      updateThreadState(handle.threadId, () => ({
         threadId: handle.threadId,
         streamId: handle.streamId,
         status: "streaming",
         usage: undefined,
         error: null
-      })
+      }))
       return handle
     },
-    [router, options.threadId]
+    [router, updateThreadState]
   )
 
   const cancelStream = useCallback(
     async (threadId?: number) => {
-      const activeStreamId = streamIdRef.current
+      let targetThreadId = threadId
+      if (targetThreadId === undefined) {
+        const activeThreads = Object.entries(threadStatesRef.current).filter(([, state]) => state.status === "streaming")
+        if (activeThreads.length !== 1) {
+          return
+        }
+        targetThreadId = Number(activeThreads[0][0])
+      }
+      if (targetThreadId === undefined) {
+        return
+      }
+      const current = threadStatesRef.current[targetThreadId]
+      const activeStreamId = current?.streamId
       if (!activeStreamId) {
         return
       }
-
       try {
         const response = await Cancel(activeStreamId)
         router.unregisterStream(activeStreamId)
-        updateState((prev) => ({
-          ...prev,
-          status: "stopped",
-          streamId: undefined
-        }))
+        updateThreadState(targetThreadId, (prev) => ({ ...prev, status: "stopped", streamId: undefined }))
         optionsRef.current.onComplete?.(response.threadId, response.status, activeStreamId)
       } catch (err) {
         const message = err instanceof Error ? err.message : "Failed to cancel stream"
-        updateState((prev) => ({ ...prev, error: message, status: "error" }))
-        optionsRef.current.onError?.(message, { threadId: threadId ?? streamThreadRef.current, streamId: activeStreamId })
-      } finally {
-        clearStreamRefs()
+        updateThreadState(targetThreadId, (prev) => ({ ...prev, error: message, status: "error" }))
+        optionsRef.current.onError?.(message, { threadId: targetThreadId, streamId: activeStreamId })
       }
     },
-    [clearStreamRefs, router, updateState]
+    [router, updateThreadState]
   )
 
-  useEffect(() => {
-    if (!streamIdRef.current) {
-      return
-    }
-    if (options.threadId !== undefined && streamThreadRef.current && streamThreadRef.current !== options.threadId) {
-      void cancelStream(streamThreadRef.current)
-    }
-  }, [cancelStream, options.threadId])
+  const getThreadState = useCallback(
+    (threadId?: number): AgentStreamState => {
+      if (typeof threadId === "number" && threadId > 0) {
+        return threadStates[threadId] ?? idleState
+      }
+      const active = Object.values(threadStates).find((state) => state.status === "streaming")
+      return active ?? idleState
+    },
+    [threadStates]
+  )
 
-  const isStreaming = streamState.status === "streaming"
-
-  const state = useMemo<AgentStreamState>(() => ({
-    threadId: streamState.threadId,
-    streamId: streamIdRef.current,
-    status: streamState.status,
-    usage: streamState.usage,
-    error: streamState.error
-  }), [streamState])
+  const isAnyStreaming = useMemo(
+    () => Object.values(threadStatesRef.current).some((state) => state.status === "streaming"),
+    [threadStates]
+  )
 
   return {
     startStream,
     cancelStream,
-    state,
-    isStreaming
+    getThreadState,
+    isAnyStreaming,
+    threadStates
   }
 }

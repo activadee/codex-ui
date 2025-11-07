@@ -17,6 +17,7 @@ import { useProjects } from "@/hooks/useProjects"
 import { useAgentThreads } from "@/hooks/useAgentThreads"
 import { useThreadConversation, normaliseConversation } from "@/hooks/useThreadConversation"
 import { useAgentStream } from "@/hooks/useAgentStream"
+import { useThreadEventRouter } from "@/lib/thread-events"
 import { usePendingAttachments } from "@/hooks/workspace/controller/usePendingAttachments"
 import { useStreamErrors } from "@/hooks/workspace/controller/useStreamErrors"
 import { useThreadActions } from "@/hooks/workspace/controller/useThreadActions"
@@ -48,6 +49,7 @@ const PAGE_SIZE = 30
 
 export function useWorkspaceController() {
   const queryClient = useQueryClient()
+  const router = useThreadEventRouter()
   const {
     projects,
     activeProject,
@@ -327,13 +329,12 @@ export function useWorkspaceController() {
     isFetchingMore: isFetchingOlderMessages
   } = useThreadConversation(activeThreadId)
 
-  const { startStream, cancelStream, state: streamState } = useAgentStream({
-    threadId: activeThreadId ?? undefined,
-    onEvent: (event, context) => {
-      const targetThreadId = context.threadId ?? activeThreadId ?? undefined
-      if (!targetThreadId) {
-        return
-      }
+  useEffect(() => {
+    if (!router || !activeThreadId) {
+      return
+    }
+    return router.subscribeToStream(activeThreadId, (event, context) => {
+      const targetThreadId = context.threadId ?? activeThreadId
       ensureTimeline(targetThreadId)
 
       if (event.type === "turn.started") {
@@ -369,7 +370,10 @@ export function useWorkspaceController() {
           message: event.error.message
         })
       }
-    },
+    })
+  }, [router, activeThreadId, appendSystemEntry, ensureTimeline, upsertAgentEntry])
+
+  const { startStream, cancelStream, getThreadState } = useAgentStream({
     onComplete: async (threadIdFromStream, statusMessage, streamId) => {
       if (streamId) {
         const attachments = pendingAttachmentsRef.current.get(streamId) ?? []
@@ -408,16 +412,10 @@ export function useWorkspaceController() {
       updateStreamError(message, context.threadId)
     }
   })
-  const isActiveThread = streamState.threadId === activeThreadId
-  const activeThreadStreamState = isActiveThread
-    ? streamState
-    : {
-        threadId: activeThreadId,
-        streamId: undefined,
-        status: "idle" as const,
-        usage: undefined,
-        error: null
-      }
+  const activeThreadStreamState = useMemo(
+    () => getThreadState(activeThreadId ?? undefined),
+    [activeThreadId, getThreadState]
+  )
   const isThreadStreaming = activeThreadStreamState.status === "streaming"
 
   useEffect(() => {
