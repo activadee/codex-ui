@@ -1,12 +1,8 @@
-import { fileChangeTopic } from "@/lib/threads"
-import type { FileDiffStat } from "@/types/app"
+import { fileChangeTopic, type ThreadFileDiffEvent } from "@/platform/eventChannels"
 
 import { createSubscription, disposeSubscription, type RuntimeSubscription } from "./subscription-helpers"
 
-export type FileDiffEvent = {
-  threadId: number
-  files: FileDiffStat[]
-}
+export type FileDiffEvent = ThreadFileDiffEvent
 
 type DiffListener = (event: FileDiffEvent) => void
 

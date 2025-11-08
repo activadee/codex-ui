@@ -1,13 +1,8 @@
-import { terminalTopic } from "@/lib/threads"
+import { terminalTopic, type AgentTerminalEvent } from "@/platform/eventChannels"
 
 import { createSubscription, disposeSubscription, type RuntimeSubscription } from "./subscription-helpers"
 
-export type TerminalEvent = {
-  threadId: number
-  type: "ready" | "output" | "exit"
-  data?: string
-  status?: string
-}
+export type TerminalEvent = AgentTerminalEvent
 
 type TerminalListener = (event: TerminalEvent) => void
 

@@ -1,4 +1,4 @@
-import { streamTopic } from "@/lib/threads"
+import { streamTopic } from "@/platform/eventChannels"
 import type { StreamEventPayload } from "@/types/app"
 
 import { createSubscription, disposeSubscription, type RuntimeSubscription } from "./subscription-helpers"
