@@ -1,8 +1,8 @@
 import { useCallback, type Dispatch, type SetStateAction } from "react"
-import { useQueryClient } from "@tanstack/react-query"
 
 import { DeleteThread, RenameThread } from "../../../../wailsjs/go/agents/API"
 import { mapThreadDtoToThread, threadToListItem } from "@/domain/threads"
+import { useAppStore } from "@/state/createAppStore"
 import type { AgentThread, ThreadListItem } from "@/types/app"
 
 type ThreadActionsDependencies = {
@@ -12,7 +12,7 @@ type ThreadActionsDependencies = {
 }
 
 export function useThreadActions({ setThreads, setActiveThread, updateStreamError }: ThreadActionsDependencies) {
-  const queryClient = useQueryClient()
+  const clearConversation = useAppStore((state) => state.clearConversation)
 
   const renameThread = useCallback(
     async (thread: ThreadListItem, title: string) => {
@@ -47,7 +47,7 @@ export function useThreadActions({ setThreads, setActiveThread, updateStreamErro
     async (thread: ThreadListItem) => {
       await DeleteThread(thread.id)
       setThreads((prev) => prev.filter((existing) => existing.id !== thread.id))
-      queryClient.removeQueries({ queryKey: ["conversation", thread.id] })
+      clearConversation(thread.id)
       setActiveThread((prev) => {
         if (prev?.id === thread.id) {
           return null
@@ -56,7 +56,7 @@ export function useThreadActions({ setThreads, setActiveThread, updateStreamErro
       })
       updateStreamError(null, thread.id)
     },
-    [queryClient, setActiveThread, setThreads, updateStreamError]
+    [clearConversation, setActiveThread, setThreads, updateStreamError]
   )
 
   return {

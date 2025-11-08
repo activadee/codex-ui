@@ -12,6 +12,7 @@ export type ConversationSlice = {
   loadConversation: (threadId: number | null) => Promise<ConversationEntry[]>
   ensureConversation: (threadId: number) => void
   updateConversationEntries: (threadId: number, updater: (entries: ConversationEntry[]) => ConversationEntry[]) => void
+  clearConversation: (threadId: number) => void
 }
 
 export const createConversationSlice = (
@@ -80,6 +81,19 @@ export const createConversationSlice = (
         return {
           ...state,
           conversationByThreadId: { ...state.conversationByThreadId, [threadId]: nextEntries }
+        }
+      })
+    },
+    clearConversation: (threadId) => {
+      if (threadId <= 0) {
+        return
+      }
+      set((state) => {
+        const next = { ...state.conversationByThreadId }
+        delete next[threadId]
+        return {
+          ...state,
+          conversationByThreadId: next
         }
       })
     }
