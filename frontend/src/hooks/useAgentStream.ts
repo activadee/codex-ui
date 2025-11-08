@@ -1,12 +1,13 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef } from "react"
 
 import { Cancel, Send } from "../../wailsjs/go/agents/API"
 import { agents } from "../../wailsjs/go/models"
 import { useEventBus, useThreadEventRouter } from "@/eventing"
 import { streamTopic } from "@/platform/eventChannels"
+import { useAppStore, useAppStoreApi } from "@/state/createAppStore"
 import type { AgentUsage, StreamEventPayload } from "@/types/app"
 
-type StreamStatus = "idle" | "streaming" | "completed" | "stopped" | "error"
+import type { ThreadStreamState } from "@/state/slices/streamsSlice"
 
 type StreamContext = { threadId?: number; streamId?: string }
 
@@ -16,57 +17,30 @@ type UseAgentStreamOptions = {
   onError?: (message: string, context: StreamContext) => void
 }
 
-type ThreadStreamState = {
-  streamId?: string
-  status: StreamStatus
-  usage?: AgentUsage
-  error?: string | null
-}
-
 const idleState: ThreadStreamState = {
   status: "idle",
   error: null
 }
 
 export function useAgentStream(options: UseAgentStreamOptions = {}) {
-  const [threadStates, setThreadStates] = useState<Record<number, ThreadStreamState>>({})
-  const threadStatesRef = useRef<Record<number, ThreadStreamState>>({})
   const optionsRef = useRef(options)
   const router = useThreadEventRouter()
   const eventBus = useEventBus()
+  const storeApi = useAppStoreApi()
 
   useEffect(() => {
     optionsRef.current = options
   }, [options])
 
-  const updateThreadState = useCallback((threadId: number, updater: (prev: ThreadStreamState) => ThreadStreamState) => {
-    setThreadStates((prev) => {
-      const current = prev[threadId] ?? idleState
-      const next = updater(current)
-      const updated: Record<number, ThreadStreamState> = { ...prev, [threadId]: next }
-      threadStatesRef.current = updated
-      return updated
-    })
-  }, [])
+  const threadStreams = useAppStore((state) => state.threadStreams)
+  const setThreadStreamState = useAppStore((state) => state.setThreadStreamState)
+  const resetThreadStream = useAppStore((state) => state.resetThreadStream)
 
-  const emitLifecycleEvent = useCallback(
-    (threadId: number, streamId: string | undefined, type: string, overrides?: Partial<StreamEventPayload>) => {
-      if (!streamId) {
-        return
-      }
-      const priority = type === "stream.start" ? "critical" : type === "stream.error" ? "high" : "default"
-      eventBus.publish(
-        streamTopic(streamId),
-        {
-          type,
-          threadId: threadId.toString(),
-          ...overrides
-        },
-        priority,
-        "useAgentStream"
-      )
+  const updateThreadState = useCallback(
+    (threadId: number, updater: (prev: ThreadStreamState) => ThreadStreamState) => {
+      setThreadStreamState(threadId, updater)
     },
-    [eventBus]
+    [setThreadStreamState]
   )
 
   const handleStreamEvent = useCallback(
@@ -93,7 +67,7 @@ export function useAgentStream(options: UseAgentStreamOptions = {}) {
       }
 
       if (event.type === "stream.complete" || event.type === "stream.error") {
-        const status: StreamStatus = event.type === "stream.complete" ? "completed" : "error"
+        const status = event.type === "stream.complete" ? "completed" : "error"
         updateThreadState(threadId, (prev) => ({
           ...prev,
           status,
@@ -102,15 +76,20 @@ export function useAgentStream(options: UseAgentStreamOptions = {}) {
         }))
         optionsRef.current.onComplete?.(threadId, event.message ?? status, streamId)
       }
+
+      eventBus.publish(streamTopic(streamId), event, event.type === "stream.error" ? "high" : "default", "runtime.stream")
     },
-    [updateThreadState]
+    [eventBus, updateThreadState]
   )
 
   const startStream = useCallback(
     async (payload: agents.MessageRequest) => {
       const targetThreadId = typeof payload.threadId === "number" ? payload.threadId : undefined
-      if (targetThreadId && threadStatesRef.current[targetThreadId]?.status === "streaming") {
-        throw new Error("That thread already has an active stream")
+      if (targetThreadId) {
+        const currentState = storeApi.getState().threadStreams[targetThreadId]
+        if (currentState?.status === "streaming") {
+          throw new Error("That thread already has an active stream")
+        }
       }
 
       const handle = await Send(payload)
@@ -121,19 +100,17 @@ export function useAgentStream(options: UseAgentStreamOptions = {}) {
         usage: undefined,
         error: null
       }))
-      emitLifecycleEvent(handle.threadId, handle.streamId, "stream.start")
       return handle
     },
-    [router, updateThreadState, emitLifecycleEvent]
+    [router, storeApi, updateThreadState]
   )
 
   const cancelStream = useCallback(
     async (threadId?: number) => {
       let targetThreadId = threadId
       if (targetThreadId === undefined) {
-        const activeThreads = Object.entries(threadStatesRef.current).filter(
-          ([, state]) => state.status === "streaming"
-        )
+        const entries = Object.entries(storeApi.getState().threadStreams)
+        const activeThreads = entries.filter(([, state]) => state.status === "streaming")
         if (activeThreads.length !== 1) {
           return
         }
@@ -142,7 +119,7 @@ export function useAgentStream(options: UseAgentStreamOptions = {}) {
       if (targetThreadId === undefined) {
         return
       }
-      const current = threadStatesRef.current[targetThreadId]
+      const current = storeApi.getState().threadStreams[targetThreadId]
       const streamId = current?.streamId
       if (!streamId) {
         return
@@ -156,7 +133,6 @@ export function useAgentStream(options: UseAgentStreamOptions = {}) {
           streamId: undefined
         }))
         optionsRef.current.onComplete?.(response.threadId, response.status, streamId)
-        emitLifecycleEvent(response.threadId, streamId, "stream.cancelled", { message: response.status })
       } catch (err) {
         const message = err instanceof Error ? err.message : "Failed to cancel stream"
         updateThreadState(targetThreadId, (prev) => ({
@@ -164,34 +140,32 @@ export function useAgentStream(options: UseAgentStreamOptions = {}) {
           error: message
         }))
         optionsRef.current.onError?.(message, { threadId: targetThreadId, streamId })
-        emitLifecycleEvent(targetThreadId, streamId, "stream.error", { error: { message } })
       }
     },
-    [router, updateThreadState, emitLifecycleEvent]
+    [router, storeApi, updateThreadState]
   )
+
   useEffect(() => router.subscribeToStream(undefined, handleStreamEvent), [router, handleStreamEvent])
 
-  const isAnyStreaming = useMemo(
-    () => Object.values(threadStatesRef.current).some((state) => state.status === "streaming"),
-    [threadStates]
-  )
+  const isAnyStreaming = useMemo(() => Object.values(threadStreams).some((state) => state.status === "streaming"), [threadStreams])
 
   const getThreadState = useCallback(
     (threadId?: number): ThreadStreamState => {
+      const states = storeApi.getState().threadStreams
       if (!threadId) {
-        const active = Object.values(threadStates).find((state) => state.status === "streaming")
-        return active ?? idleState
+        const activeEntry = Object.values(states).find((state) => state.status === "streaming")
+        return activeEntry ?? idleState
       }
-      return threadStates[threadId] ?? idleState
+      return states[threadId] ?? idleState
     },
-    [threadStates]
+    [storeApi]
   )
 
   return {
     startStream,
     cancelStream,
     isAnyStreaming,
-    threadStates,
+    threadStates: threadStreams,
     getThreadState
   }
 }

@@ -10,6 +10,7 @@ import { platformBridge, type PlatformBridge } from "@/platform/wailsBridge"
 import { createProjectsSlice, type ProjectsSlice } from "./slices/projectsSlice"
 import { createThreadsSlice, type ThreadsSlice } from "./slices/threadsSlice"
 import { createConversationSlice, type ConversationSlice } from "./slices/conversationSlice"
+import { createStreamsSlice, type StreamsSlice } from "./slices/streamsSlice"
 
 /**
  * Runtime-focused subset of the global app state.
@@ -22,7 +23,7 @@ export type RuntimeState = {
 
 export type AppHydrationStatus = "idle" | "hydrating" | "ready"
 
-export type AppState = RuntimeSlice & ProjectsSlice & ThreadsSlice & ConversationSlice
+export type AppState = RuntimeSlice & ProjectsSlice & ThreadsSlice & ConversationSlice & StreamsSlice
 
 export type RuntimeSlice = {
   runtime: RuntimeState
@@ -159,10 +160,12 @@ function createRootSlice(dependencies: AppStoreDependencies): StateCreator<AppSt
   const runtime = runtimeSlice as unknown as StateCreator<AppState, [], []>
   const threads = createThreadsSlice(dependencies.bridge) as unknown as StateCreator<AppState, [], []>
   const conversation = createConversationSlice(dependencies.bridge) as unknown as StateCreator<AppState, [], []>
+  const streams = createStreamsSlice as unknown as StateCreator<AppState, [], []>
   return (set, get, api) => ({
     ...runtime(set, get, api),
     ...projectSlice(set, get, api),
     ...threads(set, get, api),
-    ...conversation(set, get, api)
+    ...conversation(set, get, api),
+    ...streams(set, get, api)
   })
 }
