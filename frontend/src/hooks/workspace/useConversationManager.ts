@@ -1,8 +1,7 @@
 import { useCallback, useMemo } from "react"
-import { useQueryClient } from "@tanstack/react-query"
 
-import { LoadThreadConversation } from "../../../wailsjs/go/agents/API"
 import { formatThreadSections, updateThreadPreview } from "@/domain/threads"
+import { useAppStore, useAppStoreApi } from "@/state/createAppStore"
 import type {
   AgentConversationEntry,
   AgentItemPayload,
@@ -12,7 +11,6 @@ import type {
   UserConversationEntry
 } from "@/types/app"
 import type { AgentThread } from "@/types/app"
-import { normaliseConversation } from "@/hooks/useThreadConversation"
 
 export type ConversationManager = {
   sections: ThreadSection[]
@@ -31,7 +29,10 @@ export function useConversationManager(options: {
   setThreads: (updater: (threads: AgentThread[]) => AgentThread[]) => void
 }) {
   const { threads, setThreads } = options
-  const queryClient = useQueryClient()
+  const storeApi = useAppStoreApi()
+  const ensureConversation = useAppStore((state) => state.ensureConversation)
+  const updateConversationEntries = useAppStore((state) => state.updateConversationEntries)
+  const loadConversationState = useAppStore((state) => state.loadConversation)
 
   const applyThreadPreview = useCallback(
     (threadId: number, text: string, timestamp: string) => {
@@ -50,9 +51,9 @@ export function useConversationManager(options: {
       if (threadId <= 0) {
         return
       }
-      queryClient.setQueryData<ConversationEntry[]>(["conversation", threadId], (prev) => prev ?? [])
+      ensureConversation(threadId)
     },
-    [queryClient]
+    [ensureConversation]
   )
 
   const getConversationEntries = useCallback(
@@ -60,19 +61,19 @@ export function useConversationManager(options: {
       if (threadId <= 0) {
         return []
       }
-      return queryClient.getQueryData<ConversationEntry[]>(["conversation", threadId]) ?? []
+      return storeApi.getState().conversationByThreadId[threadId] ?? []
     },
-    [queryClient]
+    [storeApi]
   )
 
-  const updateConversationEntries = useCallback(
+  const updateEntries = useCallback(
     (threadId: number, updater: (entries: ConversationEntry[]) => ConversationEntry[]) => {
       if (threadId <= 0) {
         return
       }
-      queryClient.setQueryData<ConversationEntry[]>(["conversation", threadId], (prev = []) => updater(prev))
+      updateConversationEntries(threadId, updater)
     },
-    [queryClient]
+    [updateConversationEntries]
   )
 
   const applyPreviewFromEntries = useCallback(
@@ -113,29 +114,22 @@ export function useConversationManager(options: {
       if (threadId <= 0) {
         return [] as ConversationEntry[]
       }
-      try {
-        const response = await LoadThreadConversation(threadId)
-        const normalized = normaliseConversation(response)
-        queryClient.setQueryData<ConversationEntry[]>(["conversation", threadId], normalized)
-        applyPreviewFromEntries(threadId, normalized)
-        return normalized
-      } catch (error) {
-        console.error("Failed to load conversation", error)
-        return [] as ConversationEntry[]
-      }
+      const entries = await loadConversationState(threadId)
+      applyPreviewFromEntries(threadId, entries)
+      return entries
     },
-    [applyPreviewFromEntries, queryClient]
+    [applyPreviewFromEntries, loadConversationState]
   )
 
   const appendUserEntry = useCallback(
     (threadId: number, entry: UserConversationEntry) => {
       ensureTimeline(threadId)
-      updateConversationEntries(threadId, (existing) => [...existing, entry])
+      updateEntries(threadId, (existing) => [...existing, entry])
       if (entry.text.trim()) {
         applyThreadPreview(threadId, entry.text, entry.createdAt)
       }
     },
-    [applyThreadPreview, ensureTimeline, updateConversationEntries]
+    [applyThreadPreview, ensureTimeline, updateEntries]
   )
 
   const upsertAgentEntry = useCallback(
@@ -143,7 +137,7 @@ export function useConversationManager(options: {
       const identifier = item.id && item.id.trim() ? item.id : `agent-${Date.now().toString(36)}`
       const timestamp = new Date().toISOString()
       ensureTimeline(threadId)
-      updateConversationEntries(threadId, (existing) => {
+      updateEntries(threadId, (existing) => {
         const index = existing.findIndex((entry) => entry.role === "agent" && entry.id === identifier)
         if (index >= 0) {
           const current = existing[index] as AgentConversationEntry
@@ -170,15 +164,15 @@ export function useConversationManager(options: {
         applyThreadPreview(threadId, item.text, timestamp)
       }
     },
-    [applyThreadPreview, ensureTimeline, updateConversationEntries]
+    [applyThreadPreview, ensureTimeline, updateEntries]
   )
 
   const appendSystemEntry = useCallback(
     (threadId: number, entry: SystemConversationEntry) => {
       ensureTimeline(threadId)
-      updateConversationEntries(threadId, (existing) => [...existing, entry])
+      updateEntries(threadId, (existing) => [...existing, entry])
     },
-    [ensureTimeline, updateConversationEntries]
+    [ensureTimeline, updateEntries]
   )
 
   const syncThreadPreviewFromConversation = useCallback(
@@ -202,6 +196,7 @@ export function useConversationManager(options: {
     appendSystemEntry,
     ensureTimeline,
     syncThreadPreviewFromConversation,
-    getConversationEntries
+    getConversationEntries,
+    setThreads
   }
 }
