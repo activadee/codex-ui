@@ -5,6 +5,10 @@ import type { StateCreator } from "zustand"
 import { createJSONStorage, persist, subscribeWithSelector } from "zustand/middleware"
 import { immer } from "zustand/middleware/immer"
 
+import { platformBridge, type PlatformBridge } from "@/platform/wailsBridge"
+
+import { createProjectsSlice, type ProjectsSlice } from "./slices/projectsSlice"
+
 /**
  * Runtime-focused subset of the global app state.
  * Additional slices extend this shape as tasks in {@link docs/frontend-architecture.md} land.
@@ -16,7 +20,9 @@ export type RuntimeState = {
 
 export type AppHydrationStatus = "idle" | "hydrating" | "ready"
 
-export type AppState = {
+export type AppState = RuntimeSlice & ProjectsSlice
+
+export type RuntimeSlice = {
   runtime: RuntimeState
   setHydrationStatus: (status: AppHydrationStatus) => void
   setEventDiagnostics: (enabled: boolean) => void
@@ -28,11 +34,16 @@ export type CreateAppStoreOptions = {
   persist?: boolean
   storageKey?: string
   initialState?: Partial<AppState>
+  dependencies?: Partial<AppStoreDependencies>
+}
+
+export type AppStoreDependencies = {
+  bridge: PlatformBridge
 }
 
 const defaultStorageKey = "codex.app-state"
 
-const runtimeSlice: StateCreator<AppState, [], []> = (set) => ({
+const runtimeSlice: StateCreator<RuntimeSlice, [], []> = (set) => ({
   runtime: {
     hydrationStatus: "idle",
     eventDiagnosticsEnabled: false
@@ -79,8 +90,11 @@ const resolveStorage = () => {
  * Factory for the shared Zustand store described in docs/frontend-architecture.md.
  */
 export function createAppStore(options: CreateAppStoreOptions = {}): AppStore {
-  const { persist: enablePersist = true, storageKey = defaultStorageKey, initialState } = options
-  const baseCreator = runtimeSlice
+  const { persist: enablePersist = true, storageKey = defaultStorageKey, initialState, dependencies } = options
+  const resolvedDependencies: AppStoreDependencies = {
+    bridge: dependencies?.bridge ?? platformBridge
+  }
+  const baseCreator = createRootSlice(resolvedDependencies)
   const withImmer = immer<AppState>(baseCreator)
   const withSelectors = subscribeWithSelector(withImmer)
   const storage = createJSONStorage<Partial<AppState>>(() => resolveStorage())
@@ -136,4 +150,13 @@ export function useAppStoreApi(): AppStore {
     throw new Error("useAppStoreApi must be used within an AppStateProvider")
   }
   return store
+}
+
+function createRootSlice(dependencies: AppStoreDependencies): StateCreator<AppState, [], []> {
+  const projectSlice = createProjectsSlice(dependencies.bridge) as unknown as StateCreator<AppState, [], []>
+  const runtime = runtimeSlice as unknown as StateCreator<AppState, [], []>
+  return (set, get, api) => ({
+    ...runtime(set, get, api),
+    ...projectSlice(set, get, api)
+  })
 }

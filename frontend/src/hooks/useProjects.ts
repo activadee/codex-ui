@@ -1,127 +1,44 @@
-import { useCallback, useEffect, useMemo, useState } from "react"
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
+import { useCallback, useEffect, useMemo } from "react"
 
-import { DeleteProject, ListProjects, MarkProjectOpened, RegisterProject } from "../../wailsjs/go/projects/API"
-import { mapProjectDtoToProject } from "@/lib/projects"
+import { useAppStore } from "@/state/createAppStore"
 import type { Project } from "@/types/app"
 
 export function useProjects() {
-  const queryClient = useQueryClient()
-  const [projects, setProjects] = useState<Project[]>([])
-  const [activeProject, setActiveProject] = useState<Project | null>(null)
-  const [error, setError] = useState<string | null>(null)
-
-  const projectsQuery = useQuery({
-    queryKey: ["projects"],
-    queryFn: async (): Promise<Project[]> => {
-      const response = await ListProjects()
-      return response.map(mapProjectDtoToProject)
-    },
-    staleTime: 30_000
-  })
-
-  const projectsData = projectsQuery.data ?? []
+  const projects = useAppStore((state) => state.projects)
+  const activeProjectId = useAppStore((state) => state.activeProjectId)
+  const isLoading = useAppStore((state) => state.isLoadingProjects)
+  const hasLoaded = useAppStore((state) => state.hasLoadedProjects)
+  const error = useAppStore((state) => state.projectsError)
+  const loadProjects = useAppStore((state) => state.loadProjects)
+  const selectProjectById = useAppStore((state) => state.selectProjectById)
+  const registerProjectAction = useAppStore((state) => state.registerProject)
+  const deleteProject = useAppStore((state) => state.deleteProject)
 
   useEffect(() => {
-    setProjects(projectsData)
-    setActiveProject((prev) => {
-      if (projectsData.length === 0) {
-        return null
-      }
-      if (prev) {
-        const existing = projectsData.find((item) => item.id === prev.id)
-        return existing ?? projectsData[0]
-      }
-      return projectsData[0]
-    })
-  }, [projectsData])
-
-  const queryErrorMessage = useMemo(() => {
-    if (!projectsQuery.error) {
-      return null
+    if (!hasLoaded) {
+      void loadProjects()
     }
-    const err = projectsQuery.error
-    return err instanceof Error ? err.message : "Failed to load projects"
-  }, [projectsQuery.error])
+  }, [hasLoaded, loadProjects])
 
-  useEffect(() => {
-    setError(queryErrorMessage)
-  }, [queryErrorMessage])
-
-  const selectProject = useCallback(async (project: Project) => {
-    setActiveProject(project)
-    try {
-      await MarkProjectOpened(project.id)
-    } catch (err) {
-      console.error("Failed to mark project opened", err)
+  const activeProject = useMemo(() => {
+    if (!activeProjectId) {
+      return projects[0] ?? null
     }
-  }, [])
+    return projects.find((project) => project.id === activeProjectId) ?? null
+  }, [activeProjectId, projects])
 
-  const registerMutation = useMutation({
-    mutationFn: async (payload: { path: string; displayName?: string; tags?: string[] }) => {
-      const response = await RegisterProject(payload)
-      return mapProjectDtoToProject(response)
+  const selectProject = useCallback(
+    async (project: Project) => {
+      await selectProjectById(project?.id ?? null)
     },
-    onSuccess: (project) => {
-      queryClient.setQueryData<Project[]>(["projects"], (prev = []) => {
-        const index = prev.findIndex((item) => item.id === project.id)
-        if (index >= 0) {
-          const clone = [...prev]
-          clone[index] = project
-          return clone
-        }
-        return [project, ...prev]
-      })
-      setActiveProject(project)
-      setError(null)
-    },
-    onError: (err) => {
-      const message = err instanceof Error ? err.message : "Failed to register project"
-      setError(message)
-    }
-  })
-
-  const deleteMutation = useMutation({
-    mutationFn: async (id: number) => {
-      await DeleteProject(id)
-      return id
-    },
-    onSuccess: (id) => {
-      queryClient.setQueryData<Project[]>(["projects"], (prev = []) => prev.filter((project) => project.id !== id))
-      setActiveProject((current) => {
-        if (current?.id === id) {
-          return null
-        }
-        return current
-      })
-      setError(null)
-    },
-    onError: (err) => {
-      const message = err instanceof Error ? err.message : "Failed to delete project"
-      setError(message)
-    }
-  })
+    [selectProjectById]
+  )
 
   const registerProject = useCallback(
-    async (path: string, displayName?: string, tags?: string[]) => {
-      const project = await registerMutation.mutateAsync({ path, displayName, tags })
-      return project
-    },
-    [registerMutation]
+    (path: string, displayName?: string, tags?: string[]) =>
+      registerProjectAction({ path, displayName, tags }),
+    [registerProjectAction]
   )
-
-  const deleteProject = useCallback(
-    async (id: number) => {
-      await deleteMutation.mutateAsync(id)
-    },
-    [deleteMutation]
-  )
-
-  const loadProjects = useCallback(async () => {
-    await projectsQuery.refetch()
-  }, [projectsQuery])
-
-  const isLoading = projectsQuery.isPending || projectsQuery.isFetching
 
   return {
     projects,
