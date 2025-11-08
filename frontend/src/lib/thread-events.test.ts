@@ -18,7 +18,7 @@ vi.mock("../../wailsjs/runtime/runtime", () => {
 })
 
 import { EventsOff, EventsOn } from "../../wailsjs/runtime/runtime"
-import { ThreadEventRouter } from "./thread-events"
+import { EventBus, ThreadEventRouter } from "@/eventing"
 import type { StreamEventPayload } from "@/types/app"
 
 describe("ThreadEventRouter", () => {
@@ -29,7 +29,7 @@ describe("ThreadEventRouter", () => {
   })
 
   it("routes stream events to listeners and cleans up after completion", () => {
-    const router = new ThreadEventRouter()
+    const router = new ThreadEventRouter(new EventBus())
     const globalListener = vi.fn()
     const threadListener = vi.fn()
 
@@ -58,7 +58,7 @@ describe("ThreadEventRouter", () => {
   })
 
   it("shares diff subscriptions and removes runtime listener when last subscriber leaves", () => {
-    const router = new ThreadEventRouter()
+    const router = new ThreadEventRouter(new EventBus())
     const firstListener = vi.fn()
     const secondListener = vi.fn()
 

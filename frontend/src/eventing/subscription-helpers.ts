@@ -1,4 +1,4 @@
-import { EventsOff, EventsOn } from "../../../wailsjs/runtime/runtime"
+import { EventsOff, EventsOn } from "../../wailsjs/runtime/runtime"
 
 export type RuntimeSubscription = {
   topic: string

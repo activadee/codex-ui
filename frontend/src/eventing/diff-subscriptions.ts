@@ -1,5 +1,6 @@
 import { fileChangeTopic, type ThreadFileDiffEvent } from "@/platform/eventChannels"
 
+import { EventBus } from "./eventBus"
 import { createSubscription, disposeSubscription, type RuntimeSubscription } from "./subscription-helpers"
 
 export type FileDiffEvent = ThreadFileDiffEvent
@@ -7,6 +8,8 @@ export type FileDiffEvent = ThreadFileDiffEvent
 type DiffListener = (event: FileDiffEvent) => void
 
 export class DiffSubscriptionManager {
+  constructor(private readonly bus: EventBus) {}
+
   private listeners = new Map<number, Set<DiffListener>>()
   private subscriptions = new Map<number, RuntimeSubscription>()
 
@@ -60,6 +63,8 @@ export class DiffSubscriptionManager {
           console.error("Thread diff listener failed", error)
         }
       })
+
+      this.bus.publish(topic, event, "high", "runtime.diff")
     })
     this.subscriptions.set(threadId, subscription)
   }

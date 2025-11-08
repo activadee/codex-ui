@@ -1,4 +1,5 @@
 import { DiffSubscriptionManager, type FileDiffEvent } from "./diff-subscriptions"
+import { EventBus } from "./eventBus"
 import {
   StreamSubscriptionManager,
   type StreamEventListener,
@@ -11,9 +12,15 @@ export type { FileDiffEvent } from "./diff-subscriptions"
 export type { TerminalEvent } from "./terminal-subscriptions"
 
 export class ThreadEventRouter {
-  private streams = new StreamSubscriptionManager()
-  private diffs = new DiffSubscriptionManager()
-  private terminals = new TerminalSubscriptionManager()
+  private streams: StreamSubscriptionManager
+  private diffs: DiffSubscriptionManager
+  private terminals: TerminalSubscriptionManager
+
+  constructor(private readonly bus: EventBus) {
+    this.streams = new StreamSubscriptionManager(bus)
+    this.diffs = new DiffSubscriptionManager(bus)
+    this.terminals = new TerminalSubscriptionManager(bus)
+  }
 
   registerStream(handle: StreamHandleLike) {
     this.streams.register(handle)

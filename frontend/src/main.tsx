@@ -5,7 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
 
 import App from "./App"
 import "./globals.css"
-import { ThreadEventRouterProvider } from "@/lib/thread-events"
+import { ThreadEventRouterProvider } from "@/eventing"
 
 const container = document.getElementById("root")
 

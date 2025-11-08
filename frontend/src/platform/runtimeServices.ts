@@ -1,3 +1,5 @@
+import type { EventPriority } from "./eventChannels"
+
 /**
  * Runtime services provide shared tooling referenced throughout the platform layer.
  * See docs/frontend-architecture.md for the layering contract and rationale.
@@ -25,6 +27,7 @@ export type DiagnosticsEvent =
   | { type: "bridge.retry"; command: string; attempt: number; error: Error }
   | { type: "bridge.success"; command: string; durationMs: number; attempts: number }
   | { type: "bridge.failure"; command: string; attempts: number; error: Error }
+  | { type: "eventbus.publish"; topic: string; priority: EventPriority; queued: number }
 
 export type FeatureFlagClient = {
   isEnabled: (flag: string) => boolean

@@ -1,6 +1,7 @@
-import { streamTopic } from "@/platform/eventChannels"
+import { streamTopic, type EventPriority } from "@/platform/eventChannels"
 import type { StreamEventPayload } from "@/types/app"
 
+import { EventBus } from "./eventBus"
 import { createSubscription, disposeSubscription, type RuntimeSubscription } from "./subscription-helpers"
 
 export type StreamEventContext = {
@@ -16,6 +17,8 @@ export type StreamHandleLike = {
 }
 
 export class StreamSubscriptionManager {
+  constructor(private readonly bus: EventBus) {}
+
   private listeners = new Map<number, Set<StreamEventListener>>()
   private globalListeners = new Set<StreamEventListener>()
   private subscriptions = new Map<string, RuntimeSubscription>()
@@ -114,6 +117,8 @@ export class StreamSubscriptionManager {
       }
     })
 
+    this.bus.publish(streamTopic(streamId), event, resolveStreamPriority(event), "runtime.stream")
+
     if (event.type === "stream.complete" || event.type === "stream.error") {
       this.unregister(streamId)
     }
@@ -134,4 +139,14 @@ export class StreamSubscriptionManager {
     this.streamThreadMap.set(streamId, parsed)
     return parsed
   }
+}
+
+function resolveStreamPriority(event: StreamEventPayload): EventPriority {
+  if (event.type === "stream.error") {
+    return "high"
+  }
+  if (event.type === "stream.complete" || event.type === "stream.delta") {
+    return "critical"
+  }
+  return "default"
 }

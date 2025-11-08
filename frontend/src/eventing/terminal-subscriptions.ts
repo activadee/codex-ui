@@ -1,5 +1,6 @@
 import { terminalTopic, type AgentTerminalEvent } from "@/platform/eventChannels"
 
+import { EventBus } from "./eventBus"
 import { createSubscription, disposeSubscription, type RuntimeSubscription } from "./subscription-helpers"
 
 export type TerminalEvent = AgentTerminalEvent
@@ -7,6 +8,8 @@ export type TerminalEvent = AgentTerminalEvent
 type TerminalListener = (event: TerminalEvent) => void
 
 export class TerminalSubscriptionManager {
+  constructor(private readonly bus: EventBus) {}
+
   private listeners = new Map<number, Set<TerminalListener>>()
   private subscriptions = new Map<number, RuntimeSubscription>()
 
@@ -60,6 +63,8 @@ export class TerminalSubscriptionManager {
           console.error("Thread terminal listener failed", error)
         }
       })
+
+      this.bus.publish(topic, event, event.type === "exit" ? "high" : "default", "runtime.terminal")
     })
     this.subscriptions.set(threadId, subscription)
   }

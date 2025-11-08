@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react"
 
 import { Resize, Start, Stop, Write } from "../../wailsjs/go/terminal/API"
-import { useThreadEventRouter, type TerminalEvent } from "@/lib/thread-events"
+import { useThreadEventRouter, type TerminalEvent } from "@/eventing"
 
 type TerminalListenerEvent =
   | { type: "ready" }

@@ -2,7 +2,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 
 import { Cancel, Send } from "../../wailsjs/go/agents/API"
 import { agents } from "../../wailsjs/go/models"
-import { useThreadEventRouter } from "@/lib/thread-events"
+import { useEventBus, useThreadEventRouter } from "@/eventing"
+import { streamTopic } from "@/platform/eventChannels"
 import type { AgentUsage, StreamEventPayload } from "@/types/app"
 
 type StreamStatus = "idle" | "streaming" | "completed" | "stopped" | "error"
@@ -32,6 +33,7 @@ export function useAgentStream(options: UseAgentStreamOptions = {}) {
   const threadStatesRef = useRef<Record<number, ThreadStreamState>>({})
   const optionsRef = useRef(options)
   const router = useThreadEventRouter()
+  const eventBus = useEventBus()
 
   useEffect(() => {
     optionsRef.current = options
@@ -46,6 +48,26 @@ export function useAgentStream(options: UseAgentStreamOptions = {}) {
       return updated
     })
   }, [])
+
+  const emitLifecycleEvent = useCallback(
+    (threadId: number, streamId: string | undefined, type: string, overrides?: Partial<StreamEventPayload>) => {
+      if (!streamId) {
+        return
+      }
+      const priority = type === "stream.start" ? "critical" : type === "stream.error" ? "high" : "default"
+      eventBus.publish(
+        streamTopic(streamId),
+        {
+          type,
+          threadId: threadId.toString(),
+          ...overrides
+        },
+        priority,
+        "useAgentStream"
+      )
+    },
+    [eventBus]
+  )
 
   const handleStreamEvent = useCallback(
     (event: StreamEventPayload, context: StreamContext) => {
@@ -99,9 +121,10 @@ export function useAgentStream(options: UseAgentStreamOptions = {}) {
         usage: undefined,
         error: null
       }))
+      emitLifecycleEvent(handle.threadId, handle.streamId, "stream.start")
       return handle
     },
-    [router, updateThreadState]
+    [router, updateThreadState, emitLifecycleEvent]
   )
 
   const cancelStream = useCallback(
@@ -133,6 +156,7 @@ export function useAgentStream(options: UseAgentStreamOptions = {}) {
           streamId: undefined
         }))
         optionsRef.current.onComplete?.(response.threadId, response.status, streamId)
+        emitLifecycleEvent(response.threadId, streamId, "stream.cancelled", { message: response.status })
       } catch (err) {
         const message = err instanceof Error ? err.message : "Failed to cancel stream"
         updateThreadState(targetThreadId, (prev) => ({
@@ -140,9 +164,10 @@ export function useAgentStream(options: UseAgentStreamOptions = {}) {
           error: message
         }))
         optionsRef.current.onError?.(message, { threadId: targetThreadId, streamId })
+        emitLifecycleEvent(targetThreadId, streamId, "stream.error", { error: { message } })
       }
     },
-    [router, updateThreadState]
+    [router, updateThreadState, emitLifecycleEvent]
   )
   useEffect(() => router.subscribeToStream(undefined, handleStreamEvent), [router, handleStreamEvent])
 
