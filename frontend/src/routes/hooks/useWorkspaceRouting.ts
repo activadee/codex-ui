@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef } from "react"
 import { matchPath, useLocation, useNavigate } from "react-router-dom"
 
-import { threadToListItem } from "@/lib/threads"
+import { threadToListItem } from "@/domain/threads"
 import type { ThreadListItem } from "@/types/app"
 import type { ReturnTypeWorkspace } from "@/routes/hooks/useWorkspaceTypes"
 

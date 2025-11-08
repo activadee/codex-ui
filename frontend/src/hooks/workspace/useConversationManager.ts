@@ -2,7 +2,7 @@ import { useCallback, useMemo } from "react"
 import { useQueryClient } from "@tanstack/react-query"
 
 import { LoadThreadConversation } from "../../../wailsjs/go/agents/API"
-import { formatThreadSections, updateThreadPreview } from "@/lib/threads"
+import { formatThreadSections, updateThreadPreview } from "@/domain/threads"
 import type {
   AgentConversationEntry,
   AgentItemPayload,

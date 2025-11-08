@@ -2,7 +2,7 @@ import { useMemo } from "react"
 
 import { DeleteAttachment } from "../../../wailsjs/go/attachments/API"
 import { useAgentStream } from "@/hooks/useAgentStream"
-import { threadToListItem } from "@/lib/threads"
+import { threadToListItem } from "@/domain/threads"
 import type {
   AgentItemPayload,
   SystemConversationEntry,

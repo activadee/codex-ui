@@ -39,7 +39,7 @@ export function useWorkspaceController() {
   const { sections, appendUserEntry, upsertAgentEntry, appendSystemEntry, ensureTimeline, syncThreadPreviewFromConversation } =
     conversationManager
 
-  const { activeThread, setActiveThread, threadId, selectedThread, handleThreadSelect } = useThreadSelection(threads)
+  const { activeThread, setActiveThread, threadId, selectedThread, handleThreadSelect } = useThreadSelection(projectId)
   const { entries: conversationEntries } = useThreadConversation(threadId)
 
   const streamLifecycle = useStreamLifecycle({

@@ -8,6 +8,7 @@ import { immer } from "zustand/middleware/immer"
 import { platformBridge, type PlatformBridge } from "@/platform/wailsBridge"
 
 import { createProjectsSlice, type ProjectsSlice } from "./slices/projectsSlice"
+import { createThreadsSlice, type ThreadsSlice } from "./slices/threadsSlice"
 
 /**
  * Runtime-focused subset of the global app state.
@@ -20,7 +21,7 @@ export type RuntimeState = {
 
 export type AppHydrationStatus = "idle" | "hydrating" | "ready"
 
-export type AppState = RuntimeSlice & ProjectsSlice
+export type AppState = RuntimeSlice & ProjectsSlice & ThreadsSlice
 
 export type RuntimeSlice = {
   runtime: RuntimeState
@@ -155,8 +156,10 @@ export function useAppStoreApi(): AppStore {
 function createRootSlice(dependencies: AppStoreDependencies): StateCreator<AppState, [], []> {
   const projectSlice = createProjectsSlice(dependencies.bridge) as unknown as StateCreator<AppState, [], []>
   const runtime = runtimeSlice as unknown as StateCreator<AppState, [], []>
+  const threads = createThreadsSlice(dependencies.bridge) as unknown as StateCreator<AppState, [], []>
   return (set, get, api) => ({
     ...runtime(set, get, api),
-    ...projectSlice(set, get, api)
+    ...projectSlice(set, get, api),
+    ...threads(set, get, api)
   })
 }

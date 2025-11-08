@@ -2,7 +2,7 @@ import { useCallback, type Dispatch, type SetStateAction } from "react"
 import { useQueryClient } from "@tanstack/react-query"
 
 import { DeleteThread, RenameThread } from "../../../../wailsjs/go/agents/API"
-import { mapThreadDtoToThread, threadToListItem } from "@/lib/threads"
+import { mapThreadDtoToThread, threadToListItem } from "@/domain/threads"
 import type { AgentThread, ThreadListItem } from "@/types/app"
 
 type ThreadActionsDependencies = {

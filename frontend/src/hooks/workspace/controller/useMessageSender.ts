@@ -1,7 +1,7 @@
 import { useCallback } from "react"
 
 import { agents } from "../../../../wailsjs/go/models"
-import { threadToListItem } from "@/lib/threads"
+import { threadToListItem } from "@/domain/threads"
 import type {
   AgentThread,
   ThreadListItem,

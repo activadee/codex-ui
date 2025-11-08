@@ -1,4 +1,4 @@
-import { agents } from "../../wailsjs/go/models"
+import { agents } from "../../../wailsjs/go/models"
 import type { AgentThread, ThreadListItem, ThreadSection } from "@/types/app"
 
 const dateFormatter = new Intl.DateTimeFormat(undefined, {

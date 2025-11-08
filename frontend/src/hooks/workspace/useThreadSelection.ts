@@ -1,38 +1,38 @@
-import { useEffect, useMemo, useState, useCallback } from "react"
+import { useCallback, useMemo } from "react"
 
-import { threadToListItem } from "@/lib/threads"
-import type { AgentThread, ThreadListItem } from "@/types/app"
+import { threadToListItem } from "@/domain/threads"
+import { useAppStore } from "@/state/createAppStore"
+import type { ThreadListItem } from "@/types/app"
 
-export function useThreadSelection(threads: AgentThread[]) {
-  const [activeThread, setActiveThread] = useState<ThreadListItem | null>(null)
+export function useThreadSelection(projectId: number | null) {
+  const threads = useAppStore((state) => (projectId ? state.threadsByProjectId[projectId] ?? [] : []))
+  const activeThreadId = useAppStore((state) => (projectId ? state.activeThreadByProjectId[projectId] ?? null : null))
+  const setActiveThreadId = useAppStore((state) => state.setActiveThreadId)
 
-  useEffect(() => {
-    if (!threads.length) {
-      setActiveThread(null)
-      return
-    }
-    setActiveThread((prev) => {
-      if (prev) {
-        const existing = threads.find((thread) => thread.id === prev.id)
-        if (existing) {
-          return threadToListItem(existing)
-        }
-      }
-      return threadToListItem(threads[0])
-    })
-  }, [threads])
-
-  const threadId = activeThread?.id ?? null
   const selectedThread = useMemo(() => {
-    if (!activeThread) {
+    if (!threads.length) {
       return null
     }
-    return threads.find((thread) => thread.id === activeThread.id) ?? null
-  }, [activeThread, threads])
+    if (!activeThreadId) {
+      return threads[0]
+    }
+    return threads.find((thread) => thread.id === activeThreadId) ?? threads[0]
+  }, [activeThreadId, threads])
 
-  const handleThreadSelect = useCallback((thread: ThreadListItem) => {
-    setActiveThread(thread)
-  }, [])
+  const activeThread = useMemo(() => (selectedThread ? threadToListItem(selectedThread) : null), [selectedThread])
+
+  const setActiveThread = useCallback(
+    (thread: ThreadListItem | null) => {
+      if (!projectId) {
+        return
+      }
+      setActiveThreadId(projectId, thread?.id ?? null)
+    },
+    [projectId, setActiveThreadId]
+  )
+
+  const handleThreadSelect = setActiveThread
+  const threadId = selectedThread?.id ?? null
 
   return {
     activeThread,
