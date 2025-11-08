@@ -97,7 +97,10 @@ export function useThreadConversation(threadId: number | null) {
       }
     },
     getNextPageParam: (lastPage) => (lastPage.nextCursor ? lastPage.nextCursor : undefined),
-    gcTime: 120_000
+    gcTime: 120_000,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+    refetchInterval: false
   })
 
   const entries = useMemo(() => {

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useQueryClient, type InfiniteData } from "@tanstack/react-query"
 
 import type {
@@ -44,6 +44,8 @@ type ConversationPageState = {
   nextCursor?: string
   hasMore: boolean
 }
+
+type TodoListState = { items: Array<{ text: string; completed: boolean }> } | null
 
 const PAGE_SIZE = 30
 
@@ -329,6 +331,46 @@ export function useWorkspaceController() {
     isFetchingMore: isFetchingOlderMessages
   } = useThreadConversation(activeThreadId)
 
+  const latestTodoRef = useRef(false)
+  const [latestTodo, setLatestTodo] = useState<{ threadId: number | null; todo: TodoListState }>({ threadId: null, todo: null })
+
+  const extractLatestTodo = useCallback((entries: ConversationEntry[]): TodoListState => {
+    for (let index = entries.length - 1; index >= 0; index -= 1) {
+      const entry = entries[index]
+      if (entry.role === "agent" && entry.item?.type === "todo_list") {
+        const rawItems = entry.item.todoList?.items ?? []
+        const items = rawItems.map((item) => ({
+          text: item.text ?? "",
+          completed: Boolean(item.completed)
+        }))
+        return { items }
+      }
+    }
+    return null
+  }, [])
+
+  useEffect(() => {
+    if (!activeThreadId) {
+      setLatestTodo({ threadId: null, todo: null })
+      latestTodoRef.current = false
+      return
+    }
+    const todo = extractLatestTodo(conversationEntries)
+    if (todo) {
+      setLatestTodo({ threadId: activeThreadId, todo })
+      latestTodoRef.current = false
+      return
+    }
+    setLatestTodo((prev) => (prev.threadId === activeThreadId ? prev : { threadId: activeThreadId, todo: null }))
+    if (!conversationHasMore || latestTodoRef.current || typeof fetchOlderMessages !== "function") {
+      return
+    }
+    latestTodoRef.current = true
+    void fetchOlderMessages().finally(() => {
+      latestTodoRef.current = false
+    })
+  }, [activeThreadId, conversationEntries, conversationHasMore, fetchOlderMessages, extractLatestTodo])
+
   useEffect(() => {
     if (!router || !activeThreadId) {
       return
@@ -577,7 +619,8 @@ export function useWorkspaceController() {
       fetchOlder: fetchOlderMessages,
       hasMore: conversationHasMore,
       isFetching: isConversationFetching,
-      isFetchingMore: isFetchingOlderMessages
+      isFetchingMore: isFetchingOlderMessages,
+      latestTodo: latestTodo.todo
     },
     stream: {
       isStreaming: isThreadStreaming,

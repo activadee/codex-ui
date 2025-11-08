@@ -5,7 +5,6 @@ import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/componen
 import { FilesPanel } from "@/components/app/files-panel"
 import { ThreadTerminal } from "@/components/app/thread-terminal"
 import { useWorkspaceRouteContext } from "@/routes/workspace-context"
-import type { ConversationEntry } from "@/types/app"
 
 export default function ThreadRoute() {
   const {
@@ -51,7 +50,7 @@ export default function ThreadRoute() {
   const hasDraftContent = prompt.trim().length > 0 || imageAttachments.length > 0
   const canSend = Boolean(hasDraftContent && projects.active && !stream.isStreaming)
 
-  const latestTodoList = getLatestTodoList(conversation.list)
+  const latestTodoList = conversation.latestTodo
 
   return (
     <div className="flex h-full min-h-0 w-full flex-col">
@@ -127,15 +126,4 @@ export default function ThreadRoute() {
       </div>
     </div>
   )
-}
-
-function getLatestTodoList(conversationEntries: ConversationEntry[]) {
-  for (let index = conversationEntries.length - 1; index >= 0; index -= 1) {
-    const entry = conversationEntries[index]
-    if (entry.role === "agent" && entry.item?.type === "todo_list") {
-      const items = entry.item.todoList?.items ?? []
-      return { items }
-    }
-  }
-  return null
 }
