@@ -37,7 +37,9 @@ export const createConversationSlice = (
         const normalized = normaliseConversation(response)
         set((state) => ({
           ...state,
-          conversationByThreadId: { ...state.conversationByThreadId, [threadId]: normalized }
+          conversationByThreadId: { ...state.conversationByThreadId, [threadId]: normalized },
+          loadingConversationByThreadId: { ...state.loadingConversationByThreadId, [threadId]: false },
+          loadedConversationByThreadId: { ...state.loadedConversationByThreadId, [threadId]: true }
         }))
         return normalized
       } catch (error) {
@@ -46,15 +48,10 @@ export const createConversationSlice = (
           conversationErrorsByThreadId: {
             ...state.conversationErrorsByThreadId,
             [threadId]: normalizeError(error)
-          }
+          },
+          loadingConversationByThreadId: { ...state.loadingConversationByThreadId, [threadId]: false }
         }))
         throw error
-      } finally {
-        set((state) => ({
-          ...state,
-          loadingConversationByThreadId: { ...state.loadingConversationByThreadId, [threadId]: false },
-          loadedConversationByThreadId: { ...state.loadedConversationByThreadId, [threadId]: true }
-        }))
       }
     },
     ensureConversation: (threadId) => {
