@@ -5,9 +5,8 @@ import { WorkspacePanel } from "@/components/app/workspace-panel"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import { useThreadFileDiffs } from "@/hooks/useThreadFileDiffs"
+import { useAppStore } from "@/state/createAppStore"
 import { BrowserOpenURL } from "../../../wailsjs/runtime/runtime"
-import { agents } from "../../../wailsjs/go/models"
-import { platformBridge } from "@/platform/wailsBridge"
 
 type FilesPanelProps = {
   threadId?: number
@@ -16,44 +15,50 @@ type FilesPanelProps = {
 export function FilesPanel({ threadId }: FilesPanelProps) {
   const { files, isLoading, error, refresh } = useThreadFileDiffs(threadId)
   const [isCreatingPr, setIsCreatingPr] = useState(false)
-  const [prUrl, setPrUrl] = useState<string | undefined>(undefined)
   const [actionError, setActionError] = useState<string | null>(null)
+  const refreshThread = useAppStore((state) => state.refreshThread)
+  const createPullRequest = useAppStore((state) => state.createPullRequest)
+  const thread = useAppStore((state) => {
+    if (!threadId) {
+      return null
+    }
+    const projectId = state.threadProjectMap[threadId]
+    if (!projectId) {
+      return null
+    }
+    return state.threadsByProjectId[projectId]?.find((entry) => entry.id === threadId) ?? null
+  })
+  const prUrl = thread?.prUrl
+
+  useEffect(() => {
+    let cancelled = false
+    if (!threadId) {
+      setActionError(null)
+      return
+    }
+    setActionError(null)
+    void refreshThread(threadId).catch((err) => {
+      if (!cancelled) {
+        const message = err instanceof Error ? err.message : "Failed to load thread"
+        setActionError(message)
+      }
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [refreshThread, threadId])
 
   const handleRefresh = useCallback(() => {
     void refresh()
   }, [refresh])
 
   const title = files.length > 0 ? `Files (${files.length})` : "Files"
-  useEffect(() => {
-    let active = true
-    async function loadThread() {
-      setActionError(null)
-      if (!threadId) {
-        setPrUrl(undefined)
-        return
-      }
-      try {
-        const dto: agents.ThreadDTO = await platformBridge.threads.get(threadId)
-        if (!active) return
-        setPrUrl(dto?.prUrl ?? undefined)
-      } catch (e) {
-        if (!active) return
-        // Non-fatal for showing buttons
-      }
-    }
-    void loadThread()
-    return () => {
-      active = false
-    }
-  }, [threadId])
-
   const handleCreatePR = useCallback(async () => {
     if (!threadId) return
     setIsCreatingPr(true)
     setActionError(null)
     try {
-      const url = await platformBridge.threads.createPullRequest(threadId)
-      setPrUrl(url)
+      await createPullRequest(threadId)
       void refresh()
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Failed to create PR"
@@ -61,7 +66,7 @@ export function FilesPanel({ threadId }: FilesPanelProps) {
     } finally {
       setIsCreatingPr(false)
     }
-  }, [threadId, refresh])
+  }, [createPullRequest, refresh, threadId])
 
   return (
     <WorkspacePanel
