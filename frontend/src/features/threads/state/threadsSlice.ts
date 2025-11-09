@@ -50,7 +50,8 @@ export const createThreadsSlice = (bridge: PlatformBridge): StateCreator<Threads
             ...state.activeThreadByProjectId,
             [projectId]: resolveActiveThreadId(state.activeThreadByProjectId[projectId], threads)
           },
-          threadProjectMap: syncProjectMap(state.threadProjectMap, projectId, threads)
+          threadProjectMap: syncProjectMap(state.threadProjectMap, projectId, threads),
+          loadedThreadsByProjectId: { ...state.loadedThreadsByProjectId, [projectId]: true }
         }))
         return threads
       } catch (error) {
@@ -65,8 +66,7 @@ export const createThreadsSlice = (bridge: PlatformBridge): StateCreator<Threads
       } finally {
         set((state) => ({
           ...state,
-          loadingThreadsByProjectId: { ...state.loadingThreadsByProjectId, [projectId]: false },
-          loadedThreadsByProjectId: { ...state.loadedThreadsByProjectId, [projectId]: true }
+          loadingThreadsByProjectId: { ...state.loadingThreadsByProjectId, [projectId]: false }
         }))
       }
     },

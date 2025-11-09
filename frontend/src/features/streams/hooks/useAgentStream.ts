@@ -1,8 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef } from "react"
 
 import { agents } from "../../../../wailsjs/go/models"
-import { useEventBus, useThreadEventRouter } from "@/eventing"
-import { streamTopic } from "@/platform/eventChannels"
+import { useThreadEventRouter } from "@/eventing"
 import { platformBridge } from "@/platform/wailsBridge"
 import { useAppStore, useAppStoreApi } from "@/state/createAppStore"
 import type { StreamEventPayload } from "@/types/app"
@@ -25,7 +24,6 @@ const idleState: ThreadStreamState = {
 export function useAgentStream(options: UseAgentStreamOptions = {}) {
   const optionsRef = useRef(options)
   const router = useThreadEventRouter()
-  const eventBus = useEventBus()
   const storeApi = useAppStoreApi()
 
   useEffect(() => {
@@ -75,10 +73,8 @@ export function useAgentStream(options: UseAgentStreamOptions = {}) {
         }))
         optionsRef.current.onComplete?.(threadId, event.message ?? status, streamId)
       }
-
-      eventBus.publish(streamTopic(streamId), event, event.type === "stream.error" ? "high" : "default", "runtime.stream")
     },
-    [eventBus, updateThreadState]
+    [updateThreadState]
   )
 
   const startStream = useCallback(

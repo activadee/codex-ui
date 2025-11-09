@@ -33,7 +33,8 @@ export const createProjectsSlice = (bridge: PlatformBridge): StateCreator<Projec
           ...state,
           projects,
           activeProjectId: resolveActiveProjectId(state.activeProjectId, projects),
-          projectsError: null
+          projectsError: null,
+          hasLoadedProjects: true
         }))
       } catch (error) {
         set((state) => ({
@@ -41,7 +42,7 @@ export const createProjectsSlice = (bridge: PlatformBridge): StateCreator<Projec
           projectsError: normalizeError(error)
         }))
       } finally {
-        set((state) => ({ ...state, isLoadingProjects: false, hasLoadedProjects: true }))
+        set((state) => ({ ...state, isLoadingProjects: false }))
       }
     }
 
