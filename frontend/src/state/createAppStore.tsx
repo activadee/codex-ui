@@ -1,5 +1,5 @@
 import { createContext, useContext, useRef, type ReactNode } from "react"
-import { useStore } from "zustand"
+import { useStoreWithEqualityFn } from "zustand/traditional"
 import { createStore, type StoreApi } from "zustand/vanilla"
 import type { StateCreator } from "zustand"
 import { createJSONStorage, persist, subscribeWithSelector } from "zustand/middleware"
@@ -152,7 +152,7 @@ export function useAppStore<T>(selector: (state: AppState) => T, equalityFn?: (a
   if (!store) {
     throw new Error("useAppStore must be used within an AppStateProvider")
   }
-  return useStore(store, selector, equalityFn)
+  return useStoreWithEqualityFn(store, selector, equalityFn)
 }
 
 export function useAppStoreApi(): AppStore {

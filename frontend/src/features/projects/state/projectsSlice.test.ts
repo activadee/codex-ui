@@ -91,8 +91,6 @@ function createProjectDto(overrides: Partial<projects.ProjectDTO>): projects.Pro
     path: overrides.path ?? "/tmp/project",
     displayName: overrides.displayName ?? "Project",
     tags: overrides.tags ?? [],
-    lastOpenedAt: overrides.lastOpenedAt,
-    name: overrides.name,
-    description: overrides.description
+    lastOpenedAt: overrides.lastOpenedAt
   }
 }

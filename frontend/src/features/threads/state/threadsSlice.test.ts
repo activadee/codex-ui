@@ -82,13 +82,10 @@ function createThreadDto(overrides: Partial<agents.ThreadDTO>): agents.ThreadDTO
     createdAt: overrides.createdAt ?? new Date().toISOString(),
     updatedAt: overrides.updatedAt ?? new Date().toISOString(),
     lastMessageAt: overrides.lastMessageAt,
-    preview: overrides.preview,
     branch: overrides.branch,
     branchName: overrides.branchName,
     diffStat: overrides.diffStat,
     externalId: overrides.externalId,
-    lastTimestamp: overrides.lastTimestamp,
-    modelName: overrides.modelName,
     worktreePath: overrides.worktreePath,
     prUrl: overrides.prUrl,
     pullRequestNumber: overrides.pullRequestNumber
