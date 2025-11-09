@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
 import { createStore } from "zustand/vanilla"
 
-import type { projects } from "../../../wailsjs/go/models"
+import type { projects } from "@/wailsjs/go/models"
 import type { PlatformBridge } from "@/platform/wailsBridge"
 
 import { createProjectsSlice, type ProjectsSlice } from "./projectsSlice"

@@ -7,12 +7,12 @@ import { immer } from "zustand/middleware/immer"
 
 import { platformBridge, type PlatformBridge } from "@/platform/wailsBridge"
 
-import { createProjectsSlice, type ProjectsSlice } from "./slices/projectsSlice"
-import { createThreadsSlice, type ThreadsSlice } from "./slices/threadsSlice"
-import { createConversationSlice, type ConversationSlice } from "./slices/conversationSlice"
-import { createStreamsSlice, type StreamsSlice } from "./slices/streamsSlice"
-import { createTerminalSlice, type TerminalSlice } from "./slices/terminalSlice"
-import { createDiffSlice, type DiffSlice } from "./slices/diffSlice"
+import { createProjectsSlice, type ProjectsSlice } from "@/features/projects/state/projectsSlice"
+import { createThreadsSlice, type ThreadsSlice } from "@/features/threads/state/threadsSlice"
+import { createConversationSlice, type ConversationSlice } from "@/features/conversation/state/conversationSlice"
+import { createStreamsSlice, type StreamsSlice } from "@/features/streams/state/streamsSlice"
+import { createTerminalSlice, type TerminalSlice } from "@/features/terminal/state/terminalSlice"
+import { createDiffSlice, type DiffSlice } from "@/features/diffs/state/diffSlice"
 
 /**
  * Runtime-focused subset of the global app state.

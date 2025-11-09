@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef } from "react"
 
-import { agents } from "../../../../wailsjs/go/models"
+import { agents } from "@/wailsjs/go/models"
 import { useEventBus, useThreadEventRouter } from "@/eventing"
 import { streamTopic } from "@/platform/eventChannels"
 import { platformBridge } from "@/platform/wailsBridge"
