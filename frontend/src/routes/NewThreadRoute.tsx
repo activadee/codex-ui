@@ -27,11 +27,13 @@ export default function NewThreadRoute() {
   } = useWorkspaceRouteContext()
   const navigate = useNavigate()
   const params = useParams()
+  const startNewThread = workspace.threads.newThread
+  const clearStreamError = workspace.stream.setError
 
   useEffect(() => {
-    workspace.threads.newThread()
-    workspace.stream.setError(null)
-  }, [workspace])
+    startNewThread()
+    clearStreamError(null)
+  }, [clearStreamError, startNewThread])
 
   const alerts = useMemo(() => {
     const items: { id: string; message: string; tone?: "info" | "error" }[] = []
