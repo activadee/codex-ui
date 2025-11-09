@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
 import { createStore } from "zustand/vanilla"
 
-import type { agents } from "../../../../wailsjs/go/models"
+import { agents } from "../../../../wailsjs/go/models"
 import type { PlatformBridge } from "@/platform/wailsBridge"
 
 import { createThreadsSlice, type ThreadsSlice } from "./threadsSlice"
@@ -71,7 +71,7 @@ function createThreadsStore(bridge: PlatformBridge) {
 }
 
 function createThreadDto(overrides: Partial<agents.ThreadDTO>): agents.ThreadDTO {
-  return {
+  return agents.ThreadDTO.createFrom({
     id: overrides.id ?? 1,
     projectId: overrides.projectId ?? 1,
     title: overrides.title ?? "Thread",
@@ -89,5 +89,5 @@ function createThreadDto(overrides: Partial<agents.ThreadDTO>): agents.ThreadDTO
     worktreePath: overrides.worktreePath,
     prUrl: overrides.prUrl,
     pullRequestNumber: overrides.pullRequestNumber
-  }
+  })
 }

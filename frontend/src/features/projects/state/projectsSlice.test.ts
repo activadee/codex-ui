@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
 import { createStore } from "zustand/vanilla"
 
-import type { projects } from "../../../../wailsjs/go/models"
+import { projects } from "../../../../wailsjs/go/models"
 import type { PlatformBridge } from "@/platform/wailsBridge"
 
 import { createProjectsSlice, type ProjectsSlice } from "./projectsSlice"
@@ -86,11 +86,13 @@ function createProjectsStore(bridge: PlatformBridge) {
 }
 
 function createProjectDto(overrides: Partial<projects.ProjectDTO>): projects.ProjectDTO {
-  return {
+  return projects.ProjectDTO.createFrom({
     id: overrides.id ?? Math.floor(Math.random() * 1000),
     path: overrides.path ?? "/tmp/project",
     displayName: overrides.displayName ?? "Project",
     tags: overrides.tags ?? [],
-    lastOpenedAt: overrides.lastOpenedAt
-  }
+    lastOpenedAt: overrides.lastOpenedAt,
+    createdAt: overrides.createdAt ?? new Date().toISOString(),
+    updatedAt: overrides.updatedAt ?? new Date().toISOString()
+  })
 }
