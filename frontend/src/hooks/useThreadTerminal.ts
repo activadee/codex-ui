@@ -1,14 +1,14 @@
-import { useCallback, useEffect, useRef, useState } from "react"
+import { useCallback, useEffect, useRef } from "react"
 
-import { Resize, Start, Stop, Write } from "../../wailsjs/go/terminal/API"
 import { useThreadEventRouter, type TerminalEvent } from "@/eventing"
+import { platformBridge } from "@/platform/wailsBridge"
+import { useAppStore } from "@/state/createAppStore"
+import { getIdleTerminalSession, type TerminalStatus } from "@/state/slices/terminalSlice"
 
 type TerminalListenerEvent =
   | { type: "ready" }
   | { type: "output"; data: Uint8Array }
   | { type: "exit"; status?: string }
-
-type TerminalStatus = "idle" | "connecting" | "ready" | "exited" | "error"
 
 type UseThreadTerminalResponse = {
   status: TerminalStatus
@@ -22,9 +22,11 @@ type UseThreadTerminalResponse = {
 }
 
 export function useThreadTerminal(threadId?: number): UseThreadTerminalResponse {
-  const [status, setStatus] = useState<TerminalStatus>("idle")
-  const [error, setError] = useState<string | null>(null)
-  const [exitStatus, setExitStatus] = useState<string | null>(null)
+  const terminalSession = useAppStore((state) =>
+    threadId ? state.terminalSessions[threadId] ?? getIdleTerminalSession() : getIdleTerminalSession()
+  )
+  const setTerminalSession = useAppStore((state) => state.setTerminalSession)
+  const resetTerminalSession = useAppStore((state) => state.resetTerminalSession)
   const listenersRef = useRef(new Set<(event: TerminalListenerEvent) => void>())
   const activeThreadRef = useRef<number | undefined>(threadId)
   const router = useThreadEventRouter()
@@ -44,13 +46,11 @@ export function useThreadTerminal(threadId?: number): UseThreadTerminalResponse 
       return
     }
     const currentThreadId = threadId
-    setStatus("connecting")
-    setExitStatus(null)
-    setError(null)
+    setTerminalSession(currentThreadId, () => ({ status: "connecting", error: null, exitStatus: null }))
     try {
-      await Start(currentThreadId)
+      await platformBridge.terminal.start(currentThreadId)
       if (activeThreadRef.current === currentThreadId) {
-        setStatus("ready")
+        setTerminalSession(currentThreadId, (prev) => ({ ...prev, status: "ready", error: null }))
         broadcast({ type: "ready" })
       }
     } catch (err) {
@@ -58,17 +58,16 @@ export function useThreadTerminal(threadId?: number): UseThreadTerminalResponse 
         return
       }
       const message = err instanceof Error ? err.message : "Failed to start terminal"
-      setError(message)
-      setStatus("error")
+      setTerminalSession(currentThreadId, () => ({ status: "error", error: message, exitStatus: null }))
     }
-  }, [broadcast, threadId])
+  }, [broadcast, setTerminalSession, threadId])
 
   const stop = useCallback(async () => {
     if (!threadId) {
       return
     }
     try {
-      await Stop(threadId)
+      await platformBridge.terminal.stop(threadId)
     } catch (err) {
       console.error("Failed to stop terminal", err)
     }
@@ -80,16 +79,13 @@ export function useThreadTerminal(threadId?: number): UseThreadTerminalResponse 
         return
       }
       try {
-        await Write(threadId, data)
+        await platformBridge.terminal.write(threadId, data)
       } catch (err) {
-        if (status !== "error") {
-          const message = err instanceof Error ? err.message : "Failed to write to terminal"
-          setError(message)
-          setStatus("error")
-        }
+        const message = err instanceof Error ? err.message : "Failed to write to terminal"
+        setTerminalSession(threadId, (prev) => ({ ...prev, status: "error", error: message }))
       }
     },
-    [status, threadId]
+    [setTerminalSession, threadId]
   )
 
   const resize = useCallback(async (cols: number, rows: number) => {
@@ -97,18 +93,19 @@ export function useThreadTerminal(threadId?: number): UseThreadTerminalResponse 
       return
     }
     try {
-      await Resize(threadId, cols, rows)
+      await platformBridge.terminal.resize(threadId, cols, rows)
     } catch (err) {
       console.error("Failed to resize terminal", err)
     }
   }, [threadId])
 
   useEffect(() => {
+    const previousThreadId = activeThreadRef.current
     activeThreadRef.current = threadId
     if (!threadId) {
-      setStatus("idle")
-      setExitStatus(null)
-      setError(null)
+      if (previousThreadId) {
+        resetTerminalSession(previousThreadId)
+      }
       return
     }
     const unsubscribe = router.subscribeToTerminal(threadId, (payload: TerminalEvent) => {
@@ -117,7 +114,7 @@ export function useThreadTerminal(threadId?: number): UseThreadTerminalResponse 
       }
       switch (payload.type) {
         case "ready":
-          setStatus("ready")
+          setTerminalSession(payload.threadId, (prev) => ({ ...prev, status: "ready", error: null }))
           broadcast({ type: "ready" })
           break
         case "output":
@@ -127,8 +124,7 @@ export function useThreadTerminal(threadId?: number): UseThreadTerminalResponse 
           broadcast({ type: "output", data: decodeBase64(payload.data) })
           break
         case "exit":
-          setStatus("exited")
-          setExitStatus(payload.status ?? null)
+          setTerminalSession(payload.threadId, (prev) => ({ ...prev, status: "exited", exitStatus: payload.status ?? null }))
           broadcast({ type: "exit", status: payload.status })
           break
         default:
@@ -138,9 +134,9 @@ export function useThreadTerminal(threadId?: number): UseThreadTerminalResponse 
     void start()
     return () => {
       unsubscribe()
-      void Stop(threadId)
+      void platformBridge.terminal.stop(threadId)
     }
-  }, [broadcast, router, start, threadId])
+  }, [broadcast, resetTerminalSession, router, start, threadId])
 
   const subscribe = useCallback((listener: (event: TerminalListenerEvent) => void) => {
     listenersRef.current.add(listener)
@@ -150,9 +146,9 @@ export function useThreadTerminal(threadId?: number): UseThreadTerminalResponse 
   }, [])
 
   return {
-    status,
-    error,
-    exitStatus,
+    status: terminalSession.status,
+    error: terminalSession.error,
+    exitStatus: terminalSession.exitStatus,
     start,
     stop,
     send,

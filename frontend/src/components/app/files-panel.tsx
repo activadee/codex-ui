@@ -6,8 +6,8 @@ import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import { useThreadFileDiffs } from "@/hooks/useThreadFileDiffs"
 import { BrowserOpenURL } from "../../../wailsjs/runtime/runtime"
-import { CreatePullRequest, GetThread } from "../../../wailsjs/go/agents/API"
 import { agents } from "../../../wailsjs/go/models"
+import { platformBridge } from "@/platform/wailsBridge"
 
 type FilesPanelProps = {
   threadId?: number
@@ -33,7 +33,7 @@ export function FilesPanel({ threadId }: FilesPanelProps) {
         return
       }
       try {
-        const dto: agents.ThreadDTO = await GetThread(threadId)
+        const dto: agents.ThreadDTO = await platformBridge.threads.get(threadId)
         if (!active) return
         setPrUrl(dto?.prUrl ?? undefined)
       } catch (e) {
@@ -52,7 +52,7 @@ export function FilesPanel({ threadId }: FilesPanelProps) {
     setIsCreatingPr(true)
     setActionError(null)
     try {
-      const url = await CreatePullRequest(threadId)
+      const url = await platformBridge.threads.createPullRequest(threadId)
       setPrUrl(url)
       void refresh()
     } catch (err) {

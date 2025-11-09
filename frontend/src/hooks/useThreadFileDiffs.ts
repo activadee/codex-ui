@@ -1,7 +1,7 @@
-import { useCallback, useEffect, useRef, useState } from "react"
+import { useCallback, useEffect } from "react"
 
-import { ListThreadFileDiffs } from "../../wailsjs/go/agents/API"
 import { useThreadEventRouter, type FileDiffEvent } from "@/eventing"
+import { useAppStore } from "@/state/createAppStore"
 import type { FileDiffStat } from "@/types/app"
 
 type UseThreadFileDiffsResponse = {
@@ -12,41 +12,24 @@ type UseThreadFileDiffsResponse = {
 }
 
 export function useThreadFileDiffs(threadId?: number): UseThreadFileDiffsResponse {
-  const [files, setFiles] = useState<FileDiffStat[]>([])
-  const [isLoading, setIsLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const activeThreadRef = useRef<number | undefined>(threadId)
   const router = useThreadEventRouter()
+  const files = useAppStore((state) => (threadId ? state.diffsByThreadId[threadId] ?? [] : []))
+  const isLoading = useAppStore((state) => (threadId ? state.loadingDiffsByThreadId[threadId] ?? false : false))
+  const error = useAppStore((state) => (threadId ? state.diffErrorsByThreadId[threadId] ?? null : null))
+  const loadDiffsAction = useAppStore((state) => state.loadDiffs)
+  const setDiffsFromEvent = useAppStore((state) => state.setDiffsFromEvent)
 
   const loadFiles = useCallback(async () => {
     if (!threadId) {
-      setFiles([])
-      setError(null)
-      setIsLoading(false)
       return
     }
     const currentThreadId = threadId
-    setIsLoading(true)
     try {
-      const diffs = await ListThreadFileDiffs(currentThreadId)
-      if (activeThreadRef.current !== currentThreadId) {
-        return
-      }
-      setFiles(diffs ?? [])
-      setError(null)
+      await loadDiffsAction(currentThreadId)
     } catch (err) {
-      if (activeThreadRef.current !== currentThreadId) {
-        return
-      }
-      const message = err instanceof Error ? err.message : "Failed to load file changes"
-      setError(message)
-      setFiles([])
-    } finally {
-      if (activeThreadRef.current === currentThreadId) {
-        setIsLoading(false)
-      }
+      console.error("Failed to load file changes", err)
     }
-  }, [threadId])
+  }, [loadDiffsAction, threadId])
 
   useEffect(() => {
     activeThreadRef.current = threadId
@@ -58,14 +41,12 @@ export function useThreadFileDiffs(threadId?: number): UseThreadFileDiffsRespons
       return
     }
     const unsubscribe = router.subscribeToDiffs(threadId, (payload: FileDiffEvent) => {
-      setFiles(payload.files ?? [])
-      setError(null)
-      setIsLoading(false)
+      setDiffsFromEvent(payload.threadId, payload.files ?? [])
     })
     return () => {
       unsubscribe()
     }
-  }, [router, threadId])
+  }, [router, setDiffsFromEvent, threadId])
 
   const refresh = useCallback(async () => {
     await loadFiles()

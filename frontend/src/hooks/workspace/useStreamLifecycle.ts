@@ -1,8 +1,8 @@
 import { useMemo } from "react"
 
-import { DeleteAttachment } from "../../../wailsjs/go/attachments/API"
 import { useAgentStream } from "@/hooks/useAgentStream"
 import { threadToListItem } from "@/domain/threads"
+import { platformBridge } from "@/platform/wailsBridge"
 import type {
   AgentItemPayload,
   SystemConversationEntry,
@@ -94,7 +94,7 @@ export function useStreamLifecycle(options: StreamLifecycleOptions) {
           await Promise.all(
             attachments.map(async (path) => {
               try {
-                await DeleteAttachment(path)
+                await platformBridge.attachments.deleteAttachment(path)
               } catch (error) {
                 console.error("Failed to delete stream attachment", error)
               }

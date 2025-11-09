@@ -1,6 +1,6 @@
 import { useCallback, useState } from "react"
 
-import { SelectProjectDirectory } from "../../../wailsjs/go/ui/API"
+import { platformBridge } from "@/platform/wailsBridge"
 
 export function useWorkspaceDialogs() {
   const [isDialogOpen, setIsDialogOpen] = useState(false)
@@ -18,7 +18,7 @@ export function useWorkspaceDialogs() {
 
   const handleChooseDirectory = useCallback(async (currentPath: string) => {
     try {
-      return await SelectProjectDirectory(currentPath)
+      return await platformBridge.ui.selectProjectDirectory(currentPath)
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unable to open project picker."
       setDialogError(message)

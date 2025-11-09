@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef } from "react"
 
-import { DeleteAttachment } from "../../../../wailsjs/go/attachments/API"
+import { platformBridge } from "@/platform/wailsBridge"
 
 export function usePendingAttachments() {
   const pendingAttachmentsRef = useRef<Map<string, string[]>>(new Map())
@@ -17,7 +17,7 @@ export function usePendingAttachments() {
       const pending = Array.from(pendingAttachmentsRef.current.values()).flat()
       pendingAttachmentsRef.current.clear()
       pending.forEach((path) => {
-        void DeleteAttachment(path).catch((error) => {
+        void platformBridge.attachments.deleteAttachment(path).catch((error) => {
           console.error("Failed to delete pending attachment on cleanup", error)
         })
       })

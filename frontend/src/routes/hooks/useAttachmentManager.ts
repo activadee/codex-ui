@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react"
 
-import { DeleteAttachment, SaveClipboardImage } from "../../../wailsjs/go/attachments/API"
+import { platformBridge } from "@/platform/wailsBridge"
 import type { ImageAttachment } from "@/types/app"
 
 function createAttachmentId(): string {
@@ -76,7 +76,7 @@ export function useAttachmentManager(setError: (message: string | null) => void)
     return () => {
       attachmentsRef.current.forEach((attachment) => {
         URL.revokeObjectURL(attachment.previewUrl)
-        void DeleteAttachment(attachment.path).catch((error) => {
+        void platformBridge.attachments.deleteAttachment(attachment.path).catch((error) => {
           console.error("Failed to delete attachment on cleanup", error)
         })
       })
@@ -100,7 +100,7 @@ export function useAttachmentManager(setError: (message: string | null) => void)
       for (const { file, mimeType } of entries) {
         try {
           const base64 = await readFileAsBase64(file)
-          const storedPath = await SaveClipboardImage(base64, mimeType)
+          const storedPath = await platformBridge.attachments.saveClipboardImage(base64, mimeType)
           const previewUrl = URL.createObjectURL(file)
           newAttachments.push({
             id: createAttachmentId(),
@@ -131,7 +131,7 @@ export function useAttachmentManager(setError: (message: string | null) => void)
         return previous
       }
       URL.revokeObjectURL(target.previewUrl)
-      void DeleteAttachment(target.path).catch((error) => {
+      void platformBridge.attachments.deleteAttachment(target.path).catch((error) => {
         console.error("Failed to delete attachment", error)
       })
       return previous.filter((attachment) => attachment.id !== attachmentId)
@@ -148,7 +148,7 @@ export function useAttachmentManager(setError: (message: string | null) => void)
         previous.forEach((attachment) => {
           URL.revokeObjectURL(attachment.previewUrl)
           if (deleteFiles) {
-            void DeleteAttachment(attachment.path).catch((error) => {
+            void platformBridge.attachments.deleteAttachment(attachment.path).catch((error) => {
               console.error("Failed to delete attachment", error)
             })
           }

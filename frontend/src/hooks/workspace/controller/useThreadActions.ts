@@ -1,7 +1,7 @@
 import { useCallback, type Dispatch, type SetStateAction } from "react"
 
-import { DeleteThread, RenameThread } from "../../../../wailsjs/go/agents/API"
 import { mapThreadDtoToThread, threadToListItem } from "@/domain/threads"
+import { platformBridge } from "@/platform/wailsBridge"
 import { useAppStore } from "@/state/createAppStore"
 import type { AgentThread, ThreadListItem } from "@/types/app"
 
@@ -16,7 +16,7 @@ export function useThreadActions({ setThreads, setActiveThread, updateStreamErro
 
   const renameThread = useCallback(
     async (thread: ThreadListItem, title: string) => {
-      const updated = await RenameThread(thread.id, title)
+      const updated = await platformBridge.threads.rename(thread.id, title)
       const mapped = mapThreadDtoToThread(updated)
       let updatedThread: AgentThread | null = null
       setThreads((prev) =>
@@ -45,7 +45,7 @@ export function useThreadActions({ setThreads, setActiveThread, updateStreamErro
 
   const deleteThread = useCallback(
     async (thread: ThreadListItem) => {
-      await DeleteThread(thread.id)
+      await platformBridge.threads.delete(thread.id)
       setThreads((prev) => prev.filter((existing) => existing.id !== thread.id))
       clearConversation(thread.id)
       setActiveThread((prev) => {

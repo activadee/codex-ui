@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef } from "react"
 
-import { Cancel, Send } from "../../wailsjs/go/agents/API"
 import { agents } from "../../wailsjs/go/models"
 import { useEventBus, useThreadEventRouter } from "@/eventing"
 import { streamTopic } from "@/platform/eventChannels"
+import { platformBridge } from "@/platform/wailsBridge"
 import { useAppStore, useAppStoreApi } from "@/state/createAppStore"
-import type { AgentUsage, StreamEventPayload } from "@/types/app"
+import type { StreamEventPayload } from "@/types/app"
 
 import type { ThreadStreamState } from "@/state/slices/streamsSlice"
 
@@ -34,7 +34,6 @@ export function useAgentStream(options: UseAgentStreamOptions = {}) {
 
   const threadStreams = useAppStore((state) => state.threadStreams)
   const setThreadStreamState = useAppStore((state) => state.setThreadStreamState)
-  const resetThreadStream = useAppStore((state) => state.resetThreadStream)
 
   const updateThreadState = useCallback(
     (threadId: number, updater: (prev: ThreadStreamState) => ThreadStreamState) => {
@@ -92,7 +91,7 @@ export function useAgentStream(options: UseAgentStreamOptions = {}) {
         }
       }
 
-      const handle = await Send(payload)
+      const handle = await platformBridge.threads.sendMessage(payload)
       router.registerStream(handle)
       updateThreadState(handle.threadId, () => ({
         streamId: handle.streamId,
@@ -125,7 +124,7 @@ export function useAgentStream(options: UseAgentStreamOptions = {}) {
         return
       }
       try {
-        const response = await Cancel(streamId)
+        const response = await platformBridge.threads.cancelStream(streamId)
         router.unregisterStream(streamId)
         updateThreadState(targetThreadId, (prev) => ({
           ...prev,
