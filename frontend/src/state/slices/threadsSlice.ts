@@ -2,7 +2,7 @@ import type { StateCreator } from "zustand"
 
 import { mapThreadDtoToThread, updateThreadPreview } from "@/domain/threads"
 import type { PlatformBridge } from "@/platform/wailsBridge"
-import type { AgentThread } from "@/types/app"
+import type { AgentThread, FileDiffStat } from "@/types/app"
 
 export type ThreadsSlice = {
   threadsByProjectId: Record<number, AgentThread[]>
@@ -15,6 +15,8 @@ export type ThreadsSlice = {
   loadThreads: (projectId: number | null) => Promise<AgentThread[]>
   refreshThread: (threadId: number) => Promise<AgentThread | null>
   createPullRequest: (threadId: number) => Promise<string>
+  renameThread: (threadId: number, title: string) => Promise<AgentThread | null>
+  deleteThread: (threadId: number) => Promise<void>
   setActiveThreadId: (projectId: number | null, threadId: number | null) => void
   replaceThreads: (projectId: number, updater: (threads: AgentThread[]) => AgentThread[]) => void
   updateThreadPreview: (threadId: number, previewText: string, occurredAt?: string) => void
@@ -127,6 +129,65 @@ export const createThreadsSlice = (bridge: PlatformBridge): StateCreator<Threads
         })
       }
       return url
+    },
+    renameThread: async (threadId, title) => {
+      if (!threadId) {
+        return null
+      }
+      const dto = await bridge.threads.rename(threadId, title)
+      const mapped = mapThreadDtoToThread(dto)
+      const projectId = get().threadProjectMap[threadId] ?? mapped.projectId
+      if (projectId) {
+        set((state) => {
+          const threads = state.threadsByProjectId[projectId] ?? []
+          const index = threads.findIndex((thread) => thread.id === threadId)
+          if (index === -1) {
+            return state
+          }
+          const preserved = threads[index]
+          const merged: AgentThread = {
+            ...mapped,
+            preview: preserved.preview,
+            lastTimestamp: preserved.lastTimestamp
+          }
+          const nextThreads = [...threads]
+          nextThreads[index] = merged
+          return {
+            ...state,
+            threadsByProjectId: { ...state.threadsByProjectId, [projectId]: nextThreads }
+          }
+        })
+      }
+      return mapped
+    },
+    deleteThread: async (threadId) => {
+      if (!threadId) {
+        return
+      }
+      await bridge.threads.delete(threadId)
+      set((state) => {
+        const projectId = state.threadProjectMap[threadId]
+        if (!projectId) {
+          return state
+        }
+        const threads = state.threadsByProjectId[projectId] ?? []
+        const filtered = threads.filter((thread) => thread.id !== threadId)
+        const nextActive = resolveActiveThreadId(state.activeThreadByProjectId[projectId], filtered)
+        const nextMap = { ...state.threadProjectMap }
+        delete nextMap[threadId]
+        return {
+          ...state,
+          threadsByProjectId: { ...state.threadsByProjectId, [projectId]: filtered },
+          activeThreadByProjectId: { ...state.activeThreadByProjectId, [projectId]: nextActive },
+          threadProjectMap: nextMap
+        }
+      })
+      const fullState = get() as ThreadsSlice & {
+        clearConversation?: (threadId: number) => void
+        setDiffsFromEvent?: (threadId: number, files: FileDiffStat[]) => void
+      }
+      fullState.clearConversation?.(threadId)
+      fullState.setDiffsFromEvent?.(threadId, [])
     },
     setActiveThreadId: (projectId, threadId) => {
       if (!projectId) {

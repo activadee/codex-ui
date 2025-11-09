@@ -87,7 +87,6 @@ export function useWorkspaceController() {
   })
 
   const { renameThread, deleteThread } = useThreadActions({
-    setThreads,
     setActiveThread,
     updateStreamError
   })

@@ -44,7 +44,7 @@ Replace the current React Query–centric frontend with the Wails-native, Zustan
 - [x] **Move terminal & diff runtime state into the store/event layer**
   - Back terminal/diff subscriptions with Zustand slices that react to EventBus topics instead of per-hook `useState`.
   - Expose selectors/actions for terminal lifecycle, diff listings, and optimistic updates so components stay presentation-only.
-- [ ] **Align workspace panels/components with domain/state modules**
+- [x] **Align workspace panels/components with domain/state modules**
   - Route PR creation, thread refresh, and dialog flows through the existing threads/projects slices (or new domain helpers) rather than calling `wailsjs` bindings directly.
   - Update documentation/tests once these seams are in place.
 
