@@ -1,6 +1,6 @@
 import { useMemo } from "react"
 
-import { useAgentStream } from "@/hooks/useAgentStream"
+import { useAgentStream } from "@/features/streams/hooks/useAgentStream"
 import { threadToListItem } from "@/domain/threads"
 import { platformBridge } from "@/platform/wailsBridge"
 import type {

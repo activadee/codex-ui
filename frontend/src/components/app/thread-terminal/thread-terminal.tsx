@@ -2,7 +2,7 @@ import { Loader2, PowerIcon, RotateCcw } from "lucide-react"
 
 import { WorkspacePanel } from "@/components/app/workspace-panel"
 import { Button } from "@/components/ui/button"
-import { useThreadTerminal } from "@/hooks/useThreadTerminal"
+import { useThreadTerminal } from "@/features/terminal/hooks/useThreadTerminal"
 
 import { StatusBadge } from "./status-badge"
 import { useTerminalViewport } from "./useTerminalViewport"

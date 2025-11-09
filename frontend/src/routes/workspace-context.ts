@@ -2,7 +2,7 @@ import { useOutletContext } from "react-router-dom"
 
 import type { SelectOption } from "@/data/app-data"
 import type { ImageAttachment } from "@/types/app"
-import { useWorkspaceController } from "@/hooks/useWorkspaceController"
+import { useWorkspaceController } from "@/features/workspace/hooks/useWorkspaceController"
 
 export type WorkspaceRouteContextValue = {
   workspace: ReturnType<typeof useWorkspaceController>

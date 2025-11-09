@@ -1,3 +1,5 @@
+import { BrowserOpenURL } from "../../wailsjs/runtime/runtime"
+
 import type { EventPriority } from "./eventChannels"
 
 /**
@@ -9,6 +11,7 @@ export type RuntimeServices = {
   diagnostics: DiagnosticsClient
   featureFlags: FeatureFlagClient
   clock: () => number
+  openExternal: (url: string) => Promise<void>
 }
 
 export type PlatformLogger = {
@@ -103,10 +106,19 @@ export type CreateRuntimeServicesOptions = {
 export function createRuntimeServices(options: CreateRuntimeServicesOptions = {}): RuntimeServices {
   const logger = options.logger ?? createConsoleLogger()
   const diagnostics = options.diagnostics ?? createDiagnosticsClient(logger)
+  const openExternal = async (url: string) => {
+    try {
+      await BrowserOpenURL(url)
+    } catch (error) {
+      logger.error("runtime.openExternal failed", { url, error })
+      throw error
+    }
+  }
   return {
     logger,
     diagnostics,
     featureFlags: options.featureFlags ?? createFeatureFlagClient(),
-    clock: options.clock ?? defaultClock
+    clock: options.clock ?? defaultClock,
+    openExternal
   }
 }

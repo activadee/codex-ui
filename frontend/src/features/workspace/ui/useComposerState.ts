@@ -6,7 +6,7 @@ import {
   sandboxOptions,
   type SelectOption
 } from "@/data/app-data"
-import { useAttachmentManager } from "@/routes/hooks/useAttachmentManager"
+import { useAttachmentManager } from "@/features/workspace/ui/useAttachmentManager"
 
 type ComposerStream = {
   setError: (message: string | null) => void

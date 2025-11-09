@@ -47,6 +47,15 @@ Replace the current React Query–centric frontend with the Wails-native, Zustan
 - [x] **Align workspace panels/components with domain/state modules**
   - Route PR creation, thread refresh, and dialog flows through the existing threads/projects slices (or new domain helpers) rather than calling `wailsjs` bindings directly.
   - Update documentation/tests once these seams are in place.
+- [x] **Unify workspace hooks under a feature boundary**
+  - Consolidate `src/hooks/workspace` and `src/routes/hooks` into a single `src/features/workspace` (or similar) tree so controllers/composers/dialogs share one namespace.
+  - Introduce clear subfolders (e.g., `controllers`, `ui`, `routing`) and barrels to make the layered boundaries obvious per `docs/frontend-architecture.md`.
+- [x] **Introduce feature-driven folders for shared hooks**
+  - Group slice-backed hooks (projects, threads, conversations, streams) under `src/features/{domain}/hooks` instead of the flat global `hooks/` directory to reflect ownership.
+  - Update imports and docs to reflect the new module boundaries.
+- [x] **Wrap runtime helpers in platform services**
+  - Provide bridge/runtime service wrappers for `BrowserOpenURL` (and similar helpers) so UI components never import `wailsjs/runtime/runtime` directly.
+  - Ensure logging/diagnostics flows through `runtimeServices` when invoking these utilities.
 
 ## Unresolved Questions
 - none

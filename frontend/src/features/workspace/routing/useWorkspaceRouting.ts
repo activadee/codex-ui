@@ -3,7 +3,7 @@ import { matchPath, useLocation, useNavigate } from "react-router-dom"
 
 import { threadToListItem } from "@/domain/threads"
 import type { ThreadListItem } from "@/types/app"
-import type { ReturnTypeWorkspace } from "@/routes/hooks/useWorkspaceTypes"
+import type { ReturnTypeWorkspace } from "@/features/workspace/ui/useWorkspaceTypes"
 
 export type WorkspaceRoutingState = {
   sidebarLoading: boolean

@@ -1,16 +1,16 @@
 import { useCallback, useEffect } from "react"
 
 import type { ThreadListItem } from "@/types/app"
-import { useProjects } from "@/hooks/useProjects"
-import { useAgentThreads } from "@/hooks/useAgentThreads"
-import { useThreadConversation } from "@/hooks/useThreadConversation"
-import { useConversationManager } from "@/hooks/workspace/useConversationManager"
-import { useThreadSelection } from "@/hooks/workspace/useThreadSelection"
-import { useStreamLifecycle } from "@/hooks/workspace/useStreamLifecycle"
-import { usePendingAttachments } from "@/hooks/workspace/controller/usePendingAttachments"
-import { useStreamErrors } from "@/hooks/workspace/controller/useStreamErrors"
-import { useMessageSender } from "@/hooks/workspace/controller/useMessageSender"
-import { useThreadActions } from "@/hooks/workspace/controller/useThreadActions"
+import { useProjects } from "@/features/projects/hooks/useProjects"
+import { useAgentThreads } from "@/features/threads/hooks/useAgentThreads"
+import { useThreadConversation } from "@/features/conversation/hooks/useThreadConversation"
+import { useConversationManager } from "@/features/workspace/hooks/useConversationManager"
+import { useThreadSelection } from "@/features/workspace/hooks/useThreadSelection"
+import { useStreamLifecycle } from "@/features/workspace/hooks/useStreamLifecycle"
+import { usePendingAttachments } from "@/features/workspace/controllers/usePendingAttachments"
+import { useStreamErrors } from "@/features/workspace/controllers/useStreamErrors"
+import { useMessageSender } from "@/features/workspace/controllers/useMessageSender"
+import { useThreadActions } from "@/features/workspace/controllers/useThreadActions"
 
 export function useWorkspaceController() {
   const {

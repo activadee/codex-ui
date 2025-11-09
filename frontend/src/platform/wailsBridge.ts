@@ -16,7 +16,8 @@ import { Resize, Start, Stop, Write } from "../../wailsjs/go/terminal/API"
 import { SelectProjectDirectory } from "../../wailsjs/go/ui/API"
 import type { agents, projects, terminal } from "../../wailsjs/go/models"
 
-import { createRuntimeServices, type RuntimeServices, type DiagnosticsClient } from "./runtimeServices"
+import { runtimeServices } from "./runtimeClient"
+import type { RuntimeServices, DiagnosticsClient } from "./runtimeServices"
 
 /**
  * WailsBridge is the single entry point for invoking Go commands from the frontend.
@@ -106,7 +107,7 @@ export class BridgeError extends Error {
 }
 
 export function createWailsBridge(options: CreateWailsBridgeOptions = {}): PlatformBridge {
-  const services = options.services ?? createRuntimeServices()
+  const services = options.services ?? runtimeServices
   const policy = resolvePolicy(options.retryPolicy)
   const diagnosticScope = services.diagnostics.scoped("bridge")
 

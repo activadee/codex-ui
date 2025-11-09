@@ -4,9 +4,9 @@ import { useCallback, useEffect, useState } from "react"
 import { WorkspacePanel } from "@/components/app/workspace-panel"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
-import { useThreadFileDiffs } from "@/hooks/useThreadFileDiffs"
+import { useThreadFileDiffs } from "@/features/diffs/hooks/useThreadFileDiffs"
+import { runtimeServices } from "@/platform/runtimeClient"
 import { useAppStore } from "@/state/createAppStore"
-import { BrowserOpenURL } from "../../../wailsjs/runtime/runtime"
 
 type FilesPanelProps = {
   threadId?: number
@@ -78,7 +78,7 @@ export function FilesPanel({ threadId }: FilesPanelProps) {
               size="sm"
               variant="default"
               className="h-7"
-              onClick={() => prUrl && BrowserOpenURL(prUrl)}
+              onClick={() => prUrl && runtimeServices.openExternal(prUrl)}
               disabled={!threadId}
             >
               Open PR
