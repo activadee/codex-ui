@@ -3,13 +3,13 @@ module codex-ui
 go 1.25.3
 
 require (
-	github.com/activadee/godex v0.0.7
+	github.com/activadee/godex v0.0.8
 	github.com/creack/pty v1.1.24
 	github.com/fsnotify/fsnotify v1.9.0
 	github.com/go-git/go-git/v5 v5.16.3
 	github.com/google/uuid v1.6.0
 	github.com/pressly/goose/v3 v3.26.0
-	github.com/wailsapp/wails/v2 v2.10.2
+	github.com/wailsapp/wails/v2 v2.11.0
 	modernc.org/sqlite v1.40.0
 )
 
