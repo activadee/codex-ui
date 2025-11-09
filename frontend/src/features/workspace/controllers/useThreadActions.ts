@@ -1,15 +1,16 @@
-import { useCallback, type Dispatch, type SetStateAction } from "react"
+import { useCallback } from "react"
 
 import { threadToListItem } from "@/domain/threads"
 import { useAppStore } from "@/state/createAppStore"
 import type { ThreadListItem } from "@/types/app"
 
 type ThreadActionsDependencies = {
-  setActiveThread: Dispatch<SetStateAction<ThreadListItem | null>>
+  activeThread: ThreadListItem | null
+  setActiveThread: (thread: ThreadListItem | null) => void
   updateStreamError: (message: string | null, threadId?: number) => void
 }
 
-export function useThreadActions({ setActiveThread, updateStreamError }: ThreadActionsDependencies) {
+export function useThreadActions({ activeThread, setActiveThread, updateStreamError }: ThreadActionsDependencies) {
   const renameThreadAction = useAppStore((state) => state.renameThread)
   const deleteThreadAction = useAppStore((state) => state.deleteThread)
   const clearConversation = useAppStore((state) => state.clearConversation)
@@ -17,32 +18,23 @@ export function useThreadActions({ setActiveThread, updateStreamError }: ThreadA
   const renameThread = useCallback(
     async (thread: ThreadListItem, title: string) => {
       const updated = await renameThreadAction(thread.id, title)
-      if (!updated) {
-        return
+      if (activeThread && activeThread.id === updated.id) {
+        setActiveThread(threadToListItem(updated))
       }
-      setActiveThread((prev) => {
-        if (!prev || prev.id !== updated.id) {
-          return prev
-        }
-        return threadToListItem(updated)
-      })
     },
-    [renameThreadAction, setActiveThread]
+    [activeThread, renameThreadAction, setActiveThread]
   )
 
   const deleteThread = useCallback(
     async (thread: ThreadListItem) => {
       await deleteThreadAction(thread.id)
       clearConversation(thread.id)
-      setActiveThread((prev) => {
-        if (prev?.id === thread.id) {
-          return null
-        }
-        return prev
-      })
+      if (activeThread?.id === thread.id) {
+        setActiveThread(null)
+      }
       updateStreamError(null, thread.id)
     },
-    [clearConversation, deleteThreadAction, setActiveThread, updateStreamError]
+    [activeThread?.id, clearConversation, deleteThreadAction, setActiveThread, updateStreamError]
   )
 
   return {

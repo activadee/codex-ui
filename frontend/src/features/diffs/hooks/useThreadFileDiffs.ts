@@ -32,9 +32,8 @@ export function useThreadFileDiffs(threadId?: number): UseThreadFileDiffsRespons
   }, [loadDiffsAction, threadId])
 
   useEffect(() => {
-    activeThreadRef.current = threadId
     void loadFiles()
-  }, [loadFiles, threadId])
+  }, [loadFiles])
 
   useEffect(() => {
     if (!threadId) {

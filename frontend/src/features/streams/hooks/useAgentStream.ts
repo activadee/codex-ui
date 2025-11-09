@@ -1,13 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef } from "react"
 
-import { agents } from "@/wailsjs/go/models"
+import { agents } from "../../../../wailsjs/go/models"
 import { useEventBus, useThreadEventRouter } from "@/eventing"
 import { streamTopic } from "@/platform/eventChannels"
 import { platformBridge } from "@/platform/wailsBridge"
 import { useAppStore, useAppStoreApi } from "@/state/createAppStore"
 import type { StreamEventPayload } from "@/types/app"
 
-import type { ThreadStreamState } from "@/state/slices/streamsSlice"
+import type { ThreadStreamState } from "@/features/streams/state/streamsSlice"
 
 type StreamContext = { threadId?: number; streamId?: string }
 

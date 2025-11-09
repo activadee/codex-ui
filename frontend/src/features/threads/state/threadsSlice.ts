@@ -13,9 +13,9 @@ export type ThreadsSlice = {
   refreshingThreadIds: Record<number, boolean>
   threadProjectMap: Record<number, number>
   loadThreads: (projectId: number | null) => Promise<AgentThread[]>
-  refreshThread: (threadId: number) => Promise<AgentThread | null>
+  refreshThread: (threadId: number) => Promise<AgentThread>
   createPullRequest: (threadId: number) => Promise<string>
-  renameThread: (threadId: number, title: string) => Promise<AgentThread | null>
+  renameThread: (threadId: number, title: string) => Promise<AgentThread>
   deleteThread: (threadId: number) => Promise<void>
   setActiveThreadId: (projectId: number | null, threadId: number | null) => void
   replaceThreads: (projectId: number, updater: (threads: AgentThread[]) => AgentThread[]) => void
@@ -72,7 +72,7 @@ export const createThreadsSlice = (bridge: PlatformBridge): StateCreator<Threads
     },
     refreshThread: async (threadId) => {
       if (!threadId) {
-        return null
+        throw new Error("threadId is required")
       }
       set((state) => ({
         ...state,
@@ -132,7 +132,7 @@ export const createThreadsSlice = (bridge: PlatformBridge): StateCreator<Threads
     },
     renameThread: async (threadId, title) => {
       if (!threadId) {
-        return null
+        throw new Error("threadId is required")
       }
       const dto = await bridge.threads.rename(threadId, title)
       const mapped = mapThreadDtoToThread(dto)

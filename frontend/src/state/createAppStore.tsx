@@ -109,14 +109,14 @@ export function createAppStore(options: CreateAppStoreOptions = {}): AppStore {
   const withImmer = immer<AppState>(baseCreator)
   const withSelectors = subscribeWithSelector(withImmer)
   const storage = createJSONStorage<Partial<AppState>>(() => resolveStorage())
-  const enhancer = enablePersist
-    ? persist(withSelectors, {
+  const enhancer: StateCreator<AppState, [], []> = enablePersist
+    ? (persist(withSelectors, {
         name: storageKey,
         version: 1,
         storage,
         partialize: (state) => ({ runtime: state.runtime })
-      })
-    : withSelectors
+      }) as unknown as StateCreator<AppState, [], []>)
+    : (withSelectors as StateCreator<AppState, [], []>)
 
   const store = createStore<AppState>()(enhancer)
 

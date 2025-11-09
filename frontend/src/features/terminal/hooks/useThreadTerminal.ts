@@ -3,7 +3,7 @@ import { useCallback, useEffect, useRef } from "react"
 import { useThreadEventRouter, type TerminalEvent } from "@/eventing"
 import { platformBridge } from "@/platform/wailsBridge"
 import { useAppStore } from "@/state/createAppStore"
-import { getIdleTerminalSession, type TerminalStatus } from "@/state/slices/terminalSlice"
+import { getIdleTerminalSession, type TerminalStatus } from "@/features/terminal/state/terminalSlice"
 
 type TerminalListenerEvent =
   | { type: "ready" }
