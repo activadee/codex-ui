@@ -34,33 +34,42 @@ export function useConversationManager(options: {
   const ensureConversation = useAppStore((state) => state.ensureConversation)
   const updateConversationEntries = useAppStore((state) => state.updateConversationEntries)
   const loadConversationState = useAppStore((state) => state.loadConversation)
-  const liveAgentEntryIdsRef = useRef(new Map<number, Set<string>>())
+  const liveAgentEntryIdsRef = useRef(new Map<number, Map<string, string>>())
+
+  const getLiveIdentifierMap = useCallback((threadId: number) => {
+    let map = liveAgentEntryIdsRef.current.get(threadId)
+    if (!map) {
+      map = new Map()
+      liveAgentEntryIdsRef.current.set(threadId, map)
+    }
+    return map
+  }, [])
 
   const resetAgentEntries = useCallback((threadId: number) => {
     if (threadId <= 0) {
       return
     }
-    liveAgentEntryIdsRef.current.set(threadId, new Set())
+    liveAgentEntryIdsRef.current.set(threadId, new Map())
   }, [])
 
-  const markAgentEntryLive = useCallback((threadId: number, identifier: string) => {
-    if (threadId <= 0 || !identifier) {
-      return
-    }
-    const current = liveAgentEntryIdsRef.current.get(threadId)
-    if (current) {
-      current.add(identifier)
-      return
-    }
-    liveAgentEntryIdsRef.current.set(threadId, new Set([identifier]))
-  }, [])
-
-  const isAgentEntryLive = useCallback((threadId: number, identifier: string) => {
-    if (threadId <= 0 || !identifier) {
-      return false
-    }
-    return liveAgentEntryIdsRef.current.get(threadId)?.has(identifier) ?? false
-  }, [])
+  const ensureLiveIdentifier = useCallback(
+    (threadId: number, candidate: string, entries: ConversationEntry[]) => {
+      const base = candidate && candidate.trim() ? candidate.trim() : `agent-${Date.now().toString(36)}`
+      if (threadId <= 0) {
+        return base
+      }
+      const map = getLiveIdentifierMap(threadId)
+      const assigned = map.get(base)
+      if (assigned) {
+        return assigned
+      }
+      const collision = entries.some((entry) => entry.role === "agent" && entry.id === base)
+      const uniqueId = collision ? `${base}-${Date.now().toString(36)}` : base
+      map.set(base, uniqueId)
+      return uniqueId
+    },
+    [getLiveIdentifierMap]
+  )
 
   const applyThreadPreview = useCallback(
     (threadId: number, text: string, timestamp: string) => {
@@ -162,12 +171,20 @@ export function useConversationManager(options: {
 
   const upsertAgentEntry = useCallback(
     (threadId: number, item: AgentItemPayload) => {
-      const identifier = item.id && item.id.trim() ? item.id : `agent-${Date.now().toString(36)}`
+      const baseIdentifier = item.id && item.id.trim() ? item.id : `agent-${Date.now().toString(36)}`
       const timestamp = new Date().toISOString()
       ensureTimeline(threadId)
       updateEntries(threadId, (existing) => {
-        const index = existing.findIndex((entry) => entry.role === "agent" && entry.id === identifier)
-        if (index >= 0 && isAgentEntryLive(threadId, identifier)) {
+        const identifier = ensureLiveIdentifier(threadId, baseIdentifier, existing)
+        let index = -1
+        for (let idx = existing.length - 1; idx >= 0; idx -= 1) {
+          const entry = existing[idx]
+          if (entry.role === "agent" && entry.id === identifier) {
+            index = idx
+            break
+          }
+        }
+        if (index >= 0) {
           const current = existing[index] as AgentConversationEntry
           const nextEntry: AgentConversationEntry = {
             ...current,
@@ -176,7 +193,6 @@ export function useConversationManager(options: {
           }
           const nextList = [...existing]
           nextList[index] = nextEntry
-          markAgentEntryLive(threadId, identifier)
           return nextList
         }
         const nextEntry: AgentConversationEntry = {
@@ -186,7 +202,6 @@ export function useConversationManager(options: {
           updatedAt: timestamp,
           item: { ...item, id: identifier }
         }
-        markAgentEntryLive(threadId, identifier)
         return [...existing, nextEntry]
       })
 
@@ -194,7 +209,7 @@ export function useConversationManager(options: {
         applyThreadPreview(threadId, item.text, timestamp)
       }
     },
-    [applyThreadPreview, ensureTimeline, isAgentEntryLive, markAgentEntryLive, updateEntries]
+    [applyThreadPreview, ensureLiveIdentifier, ensureTimeline, updateEntries]
   )
 
   const appendSystemEntry = useCallback(
