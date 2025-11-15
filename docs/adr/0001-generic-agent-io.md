@@ -18,10 +18,10 @@
 4. **Frontend stability** – The UI needs a predictable prompt/event envelope regardless of adapter type so future slices/features (agent picker, renderer) can trust the same semantics.
 
 ## Decision Summary
-Introduce a **Generic Agent Port** consisting of `Adapter` + `Session` interfaces plus shared data contracts (Prompt, Segment, Event). All adapters (CLI or SDK) implement this port. We keep Codex via the `godex` SDK by wrapping it behind the new session interface. CLI-first concerns drive the reusable runtime runner, while Codex remains a first-class adapter that benefits from the same abstractions. `agents.yaml` manifest and registry wiring are deferred to issue #73 per scope agreement.
+Introduce a **Generic Agent Port** consisting of `Adapter` + `Session` interfaces plus shared data contracts (Prompt, Segment, Event). All adapters (CLI or SDK) implement this port. We keep Codex via the `godex` SDK by wrapping it behind the new session interface. CLI-first concerns drive the reusable runtime runner, while Codex remains a first-class adapter that benefits from the same abstractions. Adapter discovery now loads from `agents.yaml` (repo root) via `internal/config/agents.go`, which hydrates `internal/agents/registry` so new agents can ship as manifest updates.
 
 ## Architecture Overview
-- **Adapter registry** – `internal/agents/connector` defines interfaces, DTOs, and helper factories. Each adapter registers itself with metadata (id, default capabilities, launch hints).
+- **Adapter registry** – `internal/agents/connector` defines interfaces, DTOs, and helper factories. Each adapter registers itself with metadata (id, default capabilities, launch hints) sourced from `agents.yaml` and loaded through `internal/config/agents.go`.
 - **Session lifecycle** – `Adapter.Start(ctx, SessionOptions) (Session, error)` returns a long-lived session bound to a workspace/worktree. The session can accept multiple prompts (`Send`) and emits events until closed.
 - **Service integration** – `internal/agents/service.go` owns repository/worktree orchestration, instantiates adapters via registry entries, and proxies events to Wails runtime topics (unchanged topic naming).
 - **Frontend contract** – `frontend/src/platform/wailsBridge.ts` keeps the same IPC surface, but the payloads it receives now follow the new Prompt/Event schema. Feature slices consume selectors already designed for stream-first data, so they only need type updates.
