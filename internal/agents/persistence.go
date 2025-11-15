@@ -10,7 +10,7 @@ import (
 	"sync"
 	"time"
 
-    "codex-ui/internal/storage/discovery"
+	"codex-ui/internal/storage/discovery"
 )
 
 type streamPersistence struct {
@@ -117,7 +117,9 @@ func (s *streamPersistence) storeAgentItem(ctx context.Context, item *AgentItemD
 }
 
 func (s *streamPersistence) hasPersistedAgentItem(ctx context.Context, id string) bool {
-	s.ensureExistingAgentItems(ctx)
+	if err := s.ensureExistingAgentItems(ctx); err != nil {
+		return false
+	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if len(s.existingAgentItemIDs) == 0 {
@@ -127,39 +129,37 @@ func (s *streamPersistence) hasPersistedAgentItem(ctx context.Context, id string
 	return ok
 }
 
-func (s *streamPersistence) ensureExistingAgentItems(ctx context.Context) {
+func (s *streamPersistence) ensureExistingAgentItems(ctx context.Context) error {
 	s.mu.Lock()
 	if s.agentItemsLoaded {
 		s.mu.Unlock()
-		return
+		return nil
 	}
 	s.mu.Unlock()
 
 	entries, err := s.repo.ListConversationEntries(ctx, s.thread.ID)
+	if err != nil {
+		return err
+	}
 	cache := make(map[string]struct{})
-	if err == nil {
-		for _, entry := range entries {
-			if entry.Role != "agent" || len(entry.Payload) == 0 {
-				continue
-			}
-			var payload AgentItemDTO
-			if uerr := json.Unmarshal(entry.Payload, &payload); uerr != nil {
-				continue
-			}
-			if trimmed := strings.TrimSpace(payload.ID); trimmed != "" {
-				cache[trimmed] = struct{}{}
-			}
+	for _, entry := range entries {
+		if entry.Role != "agent" || len(entry.Payload) == 0 {
+			continue
+		}
+		var payload AgentItemDTO
+		if uerr := json.Unmarshal(entry.Payload, &payload); uerr != nil {
+			continue
+		}
+		if trimmed := strings.TrimSpace(payload.ID); trimmed != "" {
+			cache[trimmed] = struct{}{}
 		}
 	}
 
 	s.mu.Lock()
-	if err == nil {
-		s.existingAgentItemIDs = cache
-	} else if s.existingAgentItemIDs == nil {
-		s.existingAgentItemIDs = make(map[string]struct{})
-	}
+	s.existingAgentItemIDs = cache
 	s.agentItemsLoaded = true
 	s.mu.Unlock()
+	return nil
 }
 
 func (s *streamPersistence) recordStatus(status discovery.ThreadStatus) {
@@ -264,25 +264,25 @@ func (s *streamPersistence) finalize(ctx context.Context, status discovery.Threa
 		lastMessageAt = &now
 	}
 
-    if err := s.repo.UpdateThreadStatus(ctx, thread.ID, status, lastMessageAt); err != nil {
-        return thread, err
-    }
-    updated, err := s.repo.GetThread(ctx, thread.ID)
-    if err != nil {
-        return thread, err
-    }
-    // Attempt to resolve and persist conversation JSONL path if missing
-    if strings.TrimSpace(updated.ConversationPath) == "" && strings.TrimSpace(updated.WorktreePath) != "" {
-        if path := findLatestConversationPath(updated.WorktreePath); path != "" {
-            _ = s.repo.UpdateThreadConversationPath(ctx, updated.ID, path)
-            // refresh snapshot
-            updated.ConversationPath = path
-        }
-    }
-    s.mu.Lock()
-    s.thread = updated
-    s.mu.Unlock()
-    return updated, nil
+	if err := s.repo.UpdateThreadStatus(ctx, thread.ID, status, lastMessageAt); err != nil {
+		return thread, err
+	}
+	updated, err := s.repo.GetThread(ctx, thread.ID)
+	if err != nil {
+		return thread, err
+	}
+	// Attempt to resolve and persist conversation JSONL path if missing
+	if strings.TrimSpace(updated.ConversationPath) == "" && strings.TrimSpace(updated.WorktreePath) != "" {
+		if path := findLatestConversationPath(updated.WorktreePath); path != "" {
+			_ = s.repo.UpdateThreadConversationPath(ctx, updated.ID, path)
+			// refresh snapshot
+			updated.ConversationPath = path
+		}
+	}
+	s.mu.Lock()
+	s.thread = updated
+	s.mu.Unlock()
+	return updated, nil
 }
 
 func (s *streamPersistence) threadSnapshot() discovery.Thread {
@@ -320,42 +320,42 @@ func (s *streamPersistence) createSystemEntry(ctx context.Context, tone, message
 // under the worktree path. It looks for ".codex/sessions/*.jsonl" paths in the
 // worktree and its subdirectories and returns the most recently modified file.
 func findLatestConversationPath(worktreePath string) string {
-    root := strings.TrimSpace(worktreePath)
-    if root == "" {
-        return ""
-    }
-    var latest string
-    var latestMod time.Time
+	root := strings.TrimSpace(worktreePath)
+	if root == "" {
+		return ""
+	}
+	var latest string
+	var latestMod time.Time
 
-    // Walk the worktree but prune directories aggressively
-    _ = filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
-        if err != nil {
-            return nil
-        }
-        // Fast prune: only descend into .codex and its parent tree
-        name := d.Name()
-        if d.IsDir() {
-            // Keep walking; but no special prune for now (worktrees are small)
-            return nil
-        }
-        if !strings.HasSuffix(strings.ToLower(name), ".jsonl") {
-            return nil
-        }
-        // require sessions directory in path
-        if !strings.Contains(path, string(os.PathSeparator)+".codex"+string(os.PathSeparator)+"sessions"+string(os.PathSeparator)) &&
-            !strings.HasSuffix(path, string(os.PathSeparator)+".codex"+string(os.PathSeparator)+"sessions") {
-            return nil
-        }
-        info, ierr := d.Info()
-        if ierr != nil {
-            return nil
-        }
-        mod := info.ModTime()
-        if latest == "" || mod.After(latestMod) {
-            latest = path
-            latestMod = mod
-        }
-        return nil
-    })
-    return latest
+	// Walk the worktree but prune directories aggressively
+	_ = filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return nil
+		}
+		// Fast prune: only descend into .codex and its parent tree
+		name := d.Name()
+		if d.IsDir() {
+			// Keep walking; but no special prune for now (worktrees are small)
+			return nil
+		}
+		if !strings.HasSuffix(strings.ToLower(name), ".jsonl") {
+			return nil
+		}
+		// require sessions directory in path
+		if !strings.Contains(path, string(os.PathSeparator)+".codex"+string(os.PathSeparator)+"sessions"+string(os.PathSeparator)) &&
+			!strings.HasSuffix(path, string(os.PathSeparator)+".codex"+string(os.PathSeparator)+"sessions") {
+			return nil
+		}
+		info, ierr := d.Info()
+		if ierr != nil {
+			return nil
+		}
+		mod := info.ModTime()
+		if latest == "" || mod.After(latestMod) {
+			latest = path
+			latestMod = mod
+		}
+		return nil
+	})
+	return latest
 }
