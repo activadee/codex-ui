@@ -39,7 +39,7 @@ func StartBackgroundPRStream(worktree, sandboxMode, instruction string) (*prStre
     if err != nil { return nil, fmt.Errorf("initialise codex adapter: %w", err) }
     sandbox := strings.TrimSpace(sandboxMode)
     if sandbox == "" { sandbox = "workspace-write" }
-    req := MessageRequest{ ThreadOptions: ThreadOptionsDTO{ Model: "gpt-5", SandboxMode: sandbox, ReasoningLevel: "minimal", WorkingDirectory: worktree, SkipGitRepoCheck: false }, Input: instruction }
+    req := MessageRequest{ ThreadOptions: ThreadOptionsDTO{ Model: "gpt-5.1-codex", SandboxMode: sandbox, ReasoningLevel: "minimal", WorkingDirectory: worktree, SkipGitRepoCheck: false }, Input: instruction }
     ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
     res, err := adapter.Stream(ctx, req)
     if err != nil { cancel(); return nil, err }
