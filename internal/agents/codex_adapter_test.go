@@ -24,7 +24,7 @@ func TestCodexAdapter_Stream_TextInput(t *testing.T) {
 	req := MessageRequest{
 		Input: "summarise",
 		ThreadOptions: ThreadOptionsDTO{
-			Model: "gpt-5",
+			Model: "gpt-5.1-codex",
 		},
 	}
 
@@ -74,7 +74,7 @@ func TestCodexAdapter_Stream_SegmentsValidation(t *testing.T) {
 	req := MessageRequest{
 		Segments: []InputSegmentDTO{{Type: "text"}},
 		ThreadOptions: ThreadOptionsDTO{
-			Model: "gpt-5",
+			Model: "gpt-5.1-codex",
 		},
 	}
 
