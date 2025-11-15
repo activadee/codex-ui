@@ -46,7 +46,7 @@ export function useStreamLifecycle(options: StreamLifecycleOptions) {
     pendingAttachmentsRef
   } = options
 
-  const { startStream, cancelStream, getThreadState } = useAgentStream({
+  const { startStream, cancelStream, getThreadState, threadStates } = useAgentStream({
     onEvent: (event, context) => {
       const targetThreadId = context.threadId ?? activeThreadId ?? undefined
       if (!targetThreadId) {
@@ -128,7 +128,12 @@ export function useStreamLifecycle(options: StreamLifecycleOptions) {
     }
   })
 
-  const threadStreamState = useMemo(() => getThreadState(activeThreadId ?? undefined), [activeThreadId, getThreadState])
+  const threadStreamState = useMemo(() => {
+    if (activeThreadId) {
+      return threadStates[activeThreadId] ?? getThreadState(activeThreadId)
+    }
+    return getThreadState(undefined)
+  }, [activeThreadId, getThreadState, threadStates])
 
   return {
     startStream,
