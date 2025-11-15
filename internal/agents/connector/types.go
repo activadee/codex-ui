@@ -65,6 +65,7 @@ type SessionOptions struct {
 	Thread           discovery.Thread
 	WorkingDirectory string
 	SandboxMode      string
+	SkipGitRepoCheck bool
 	Env              map[string]string
 	Metadata         map[string]any
 }

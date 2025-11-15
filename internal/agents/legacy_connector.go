@@ -49,6 +49,7 @@ func SessionOptionsFromLegacy(thread discovery.Thread, req MessageRequest, env m
 		Thread:           thread,
 		WorkingDirectory: strings.TrimSpace(req.ThreadOptions.WorkingDirectory),
 		SandboxMode:      thread.SandboxMode,
+		SkipGitRepoCheck: req.ThreadOptions.SkipGitRepoCheck,
 		Env:              nil,
 		Metadata:         map[string]any{},
 	}
@@ -69,6 +70,9 @@ func SessionOptionsFromLegacy(thread discovery.Thread, req MessageRequest, env m
 	}
 	if req.ThreadID != 0 {
 		opts.Metadata["threadId"] = req.ThreadID
+	}
+	if req.ThreadOptions.SkipGitRepoCheck {
+		opts.Metadata["skipGitRepoCheck"] = true
 	}
 	if len(opts.Metadata) == 0 {
 		opts.Metadata = nil

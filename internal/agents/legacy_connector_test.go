@@ -65,6 +65,7 @@ func TestSessionOptionsFromLegacy(t *testing.T) {
 		ThreadOptions: ThreadOptionsDTO{
 			WorkingDirectory: "/override",
 			SandboxMode:      "strict",
+			SkipGitRepoCheck: true,
 		},
 	}
 	env := map[string]string{"FOO": "bar"}
@@ -78,6 +79,9 @@ func TestSessionOptionsFromLegacy(t *testing.T) {
 	if options.SandboxMode != req.ThreadOptions.SandboxMode {
 		t.Fatalf("expected sandbox override to apply")
 	}
+	if !options.SkipGitRepoCheck {
+		t.Fatalf("expected skip git repo check flag to propagate")
+	}
 	if options.Env["FOO"] != "bar" {
 		t.Fatalf("expected env map to be copied")
 	}
@@ -87,6 +91,10 @@ func TestSessionOptionsFromLegacy(t *testing.T) {
 	}
 	if options.Metadata["threadExternalId"].(string) != req.ThreadExternalID {
 		t.Fatalf("expected thread external id metadata")
+	}
+	skipMeta, ok := options.Metadata["skipGitRepoCheck"].(bool)
+	if !ok || !skipMeta {
+		t.Fatalf("expected skipGitRepoCheck metadata to be true")
 	}
 }
 
