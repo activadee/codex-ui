@@ -3,3 +3,4 @@ node_modules
 frontend/dist
 !frontend/dist/.keep
 build
+AGENTS.md
