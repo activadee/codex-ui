@@ -70,7 +70,7 @@ export function useWorkspaceController() {
   const handleNewThread = useCallback(() => {
     setActiveThread(null)
     updateStreamError(null)
-  }, [updateStreamError])
+  }, [setActiveThread, updateStreamError])
 
   const sendMessage = useMessageSender({
     activeProject,

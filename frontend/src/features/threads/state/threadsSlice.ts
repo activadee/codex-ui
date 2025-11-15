@@ -243,7 +243,10 @@ function resolveActiveThreadId(currentId: number | null | undefined, threads: Ag
   if (!threads.length) {
     return null
   }
-  if (currentId && threads.some((thread) => thread.id === currentId)) {
+  if (currentId === null) {
+    return null
+  }
+  if (typeof currentId === "number" && threads.some((thread) => thread.id === currentId)) {
     return currentId
   }
   return threads[0]?.id ?? null

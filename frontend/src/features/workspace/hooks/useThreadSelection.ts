@@ -6,15 +6,18 @@ import type { ThreadListItem } from "@/types/app"
 
 export function useThreadSelection(projectId: number | null) {
   const threads = useAppStore((state) => (projectId ? state.threadsByProjectId[projectId] ?? [] : []))
-  const activeThreadId = useAppStore((state) => (projectId ? state.activeThreadByProjectId[projectId] ?? null : null))
+  const activeThreadId = useAppStore((state) => (projectId ? state.activeThreadByProjectId[projectId] : undefined))
   const setActiveThreadId = useAppStore((state) => state.setActiveThreadId)
 
   const selectedThread = useMemo(() => {
     if (!threads.length) {
       return null
     }
-    if (!activeThreadId) {
+    if (activeThreadId === undefined) {
       return threads[0]
+    }
+    if (activeThreadId === null) {
+      return null
     }
     return threads.find((thread) => thread.id === activeThreadId) ?? threads[0]
   }, [activeThreadId, threads])
