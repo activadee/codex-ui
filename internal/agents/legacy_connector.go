@@ -8,6 +8,16 @@ import (
 	"codex-ui/internal/storage/discovery"
 )
 
+const (
+	legacyItemTypeAgentMessage     = "agent_message"
+	legacyItemTypeCommandExecution = "command_execution"
+	legacyItemTypeFileChange       = "file_change"
+	legacyItemTypeMcpToolCall      = "mcp_tool_call"
+	legacyItemTypeWebSearch        = "web_search"
+	legacyItemTypeTodoList         = "todo_list"
+	legacyItemTypeError            = "error"
+)
+
 // MessageRequestToPrompt converts the legacy request DTO into a connector prompt.
 func MessageRequestToPrompt(req MessageRequest) (connector.Prompt, error) {
 	segments, err := legacySegmentsToPromptSegments(req.Segments)
@@ -197,10 +207,20 @@ func mapLegacyEventType(eventType string) connector.EventType {
 		return connector.EventTypeItemUpdated
 	case "item.completed":
 		return connector.EventTypeItemCompleted
+	case "plan.updated":
+		return connector.EventTypePlanUpdated
+	case "tool.started":
+		return connector.EventTypeToolStarted
+	case "tool.completed":
+		return connector.EventTypeToolCompleted
+	case "diff.summary":
+		return connector.EventTypeDiffSummary
+	case "usage.updated":
+		return connector.EventTypeUsageUpdated
 	case "error":
 		return connector.EventTypeSessionError
 	default:
-		return connector.EventTypeCustom
+		return connector.EventType(eventType)
 	}
 }
 
@@ -220,6 +240,16 @@ func mapConnectorEventType(eventType connector.EventType) string {
 		return "item.updated"
 	case connector.EventTypeItemCompleted:
 		return "item.completed"
+	case connector.EventTypePlanUpdated:
+		return "plan.updated"
+	case connector.EventTypeToolStarted:
+		return "tool.started"
+	case connector.EventTypeToolCompleted:
+		return "tool.completed"
+	case connector.EventTypeDiffSummary:
+		return "diff.summary"
+	case connector.EventTypeUsageUpdated:
+		return "usage.updated"
 	case connector.EventTypeSessionError:
 		return "error"
 	default:
@@ -274,14 +304,14 @@ func connectorPayloadToLegacy(payload connector.EventPayload) *AgentItemDTO {
 	case *connector.AgentMessage:
 		return &AgentItemDTO{
 			ID:        v.ID,
-			Type:      "message",
+			Type:      legacyItemTypeAgentMessage,
 			Text:      v.Text,
 			Reasoning: v.Reasoning,
 		}
 	case *connector.CommandRun:
 		return &AgentItemDTO{
 			ID:   v.ID,
-			Type: "command",
+			Type: legacyItemTypeCommandExecution,
 			Command: &CommandExecutionDTO{
 				Command:          v.Command,
 				AggregatedOutput: v.Output,
@@ -298,11 +328,11 @@ func connectorPayloadToLegacy(payload connector.EventPayload) *AgentItemDTO {
 				Status: change.Status,
 			})
 		}
-		return &AgentItemDTO{ID: v.ID, Type: "diff", FileDiffs: changes}
+		return &AgentItemDTO{ID: v.ID, Type: legacyItemTypeFileChange, FileDiffs: changes}
 	case *connector.ToolCall:
 		return &AgentItemDTO{
 			ID:   v.ID,
-			Type: "tool",
+			Type: legacyItemTypeMcpToolCall,
 			ToolCall: &ToolCallDTO{
 				Server: v.Server,
 				Tool:   v.Tool,
@@ -310,15 +340,15 @@ func connectorPayloadToLegacy(payload connector.EventPayload) *AgentItemDTO {
 			},
 		}
 	case *connector.WebSearch:
-		return &AgentItemDTO{ID: v.ID, Type: "web_search", WebSearch: &WebSearchDTO{Query: v.Query}}
+		return &AgentItemDTO{ID: v.ID, Type: legacyItemTypeWebSearch, WebSearch: &WebSearchDTO{Query: v.Query}}
 	case *connector.TodoList:
 		items := make([]TodoItemDTO, 0, len(v.Items))
 		for _, todo := range v.Items {
 			items = append(items, TodoItemDTO{Text: todo.Text, Completed: todo.Completed})
 		}
-		return &AgentItemDTO{ID: v.ID, Type: "todo_list", TodoList: &TodoListDTO{Items: items}}
+		return &AgentItemDTO{ID: v.ID, Type: legacyItemTypeTodoList, TodoList: &TodoListDTO{Items: items}}
 	case *connector.ErrorItem:
-		return &AgentItemDTO{ID: v.ID, Type: "error", Error: &ErrorItemDTO{Message: v.Message}}
+		return &AgentItemDTO{ID: v.ID, Type: legacyItemTypeError, Error: &ErrorItemDTO{Message: v.Message}}
 	default:
 		return nil
 	}

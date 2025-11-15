@@ -98,7 +98,7 @@ func TestStreamEventRoundTrip(t *testing.T) {
 		Message:  "done",
 		Item: &AgentItemDTO{
 			ID:   "item-1",
-			Type: "command",
+			Type: legacyItemTypeCommandExecution,
 			Command: &CommandExecutionDTO{
 				Command:          "ls",
 				AggregatedOutput: "output",
@@ -129,5 +129,75 @@ func TestStreamEventRoundTrip(t *testing.T) {
 	}
 	if *round.Item.Command.ExitCode != *legacy.Item.Command.ExitCode {
 		t.Fatalf("expected exit code to round-trip")
+	}
+	if round.Item.Type != legacy.Item.Type {
+		t.Fatalf("expected item type %s, got %s", legacy.Item.Type, round.Item.Type)
+	}
+}
+
+func TestConnectorPayloadToLegacyTypes(t *testing.T) {
+	exitCode := 1
+	cases := []struct {
+		name     string
+		payload  connector.EventPayload
+		expected string
+	}{
+		{
+			name:     "agent message",
+			payload:  &connector.AgentMessage{ID: "a", Text: "hi"},
+			expected: legacyItemTypeAgentMessage,
+		},
+		{
+			name:     "command",
+			payload:  &connector.CommandRun{ID: "c", Command: "ls", ExitCode: &exitCode, Status: "succeeded"},
+			expected: legacyItemTypeCommandExecution,
+		},
+		{
+			name:     "diff chunk",
+			payload:  &connector.DiffChunk{ID: "d", Changes: []connector.FileChange{{Path: "main.go", Kind: "mod", Status: "updated"}}},
+			expected: legacyItemTypeFileChange,
+		},
+		{
+			name:     "tool call",
+			payload:  &connector.ToolCall{ID: "tool", Server: "mcp", Tool: "fmt", Status: "running"},
+			expected: legacyItemTypeMcpToolCall,
+		},
+		{
+			name:     "web search",
+			payload:  &connector.WebSearch{ID: "search", Query: "codex"},
+			expected: legacyItemTypeWebSearch,
+		},
+		{
+			name:     "todo list",
+			payload:  &connector.TodoList{ID: "todo", Items: []connector.TodoItem{{Text: "one", Completed: true}}},
+			expected: legacyItemTypeTodoList,
+		},
+		{
+			name:     "error",
+			payload:  &connector.ErrorItem{ID: "err", Message: "boom"},
+			expected: legacyItemTypeError,
+		},
+	}
+	for _, tc := range cases {
+		item := connectorPayloadToLegacy(tc.payload)
+		if item == nil {
+			t.Fatalf("%s: expected item", tc.name)
+		}
+		if item.Type != tc.expected {
+			t.Fatalf("%s: expected type %s, got %s", tc.name, tc.expected, item.Type)
+		}
+	}
+}
+
+func TestMapLegacyEventTypePassThrough(t *testing.T) {
+	if got := mapLegacyEventType("usage.updated"); got != connector.EventTypeUsageUpdated {
+		t.Fatalf("expected usage.updated constant, got %s", got)
+	}
+	custom := "agent.custom"
+	if got := mapLegacyEventType(custom); string(got) != custom {
+		t.Fatalf("expected custom type passthrough, got %s", got)
+	}
+	if legacy := mapConnectorEventType(connector.EventTypePlanUpdated); legacy != "plan.updated" {
+		t.Fatalf("expected plan.updated string, got %s", legacy)
 	}
 }
