@@ -1,0 +1,14 @@
+agents:
+  - id: codex_godex
+    name: "Codex (SDK)"
+    backend: "godex"
+    model: "gpt-5"
+
+  - id: codex_cli
+    name: "Codex CLI"
+    backend: "cli"
+    cmd: "codex"
+    args: ["exec", "--json"]
+    env:
+      CODEX_API_KEY: "${CODEX_API_KEY}"
+
