@@ -46,6 +46,9 @@ func (a *Adapter) capabilities() connector.CapabilitySet {
 
 // Start spawns the CLI command wired to the provided session options.
 func (a *Adapter) Start(ctx context.Context, opts connector.SessionOptions) (connector.Session, error) {
+	if ctx == nil {
+		ctx = context.Background()
+	}
 	name := strings.TrimSpace(a.Cmd)
 	if name == "" {
 		return nil, errors.New("cmd is required")
@@ -303,10 +306,7 @@ func mapKnownCLIType(value string) string {
 func stringField(raw map[string]any, key string) (string, bool) {
 	if value, ok := raw[key]; ok {
 		if text, ok := value.(string); ok {
-			trimmed := strings.TrimSpace(text)
-			if trimmed != "" {
-				return trimmed, true
-			}
+			return text, true
 		}
 	}
 	return "", false
