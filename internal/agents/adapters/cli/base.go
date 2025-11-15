@@ -399,7 +399,7 @@ func formatEnvMap(values map[string]string) []string {
 	}
 	result := make([]string, 0, len(values))
 	for key, value := range values {
-		result = append(result, fmt.Sprintf("%s=%s", key, value))
+		result = append(result, fmt.Sprintf("%s=%s", key, os.ExpandEnv(value)))
 	}
 	return result
 }
