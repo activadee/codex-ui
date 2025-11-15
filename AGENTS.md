@@ -1,20 +1,6 @@
-Developer: # Conciseness-First Communication
+# Conciseness-First Communication
 
 - Be maximally concise in all interactions and commit messages; prioritize brevity over grammar at all times.
-
-## Changesets
-
-- To add a changeset: create a new file in the `.changeset` directory.
-- Format: `0000-your-change.md`.
-- Self-select patch, minor, or major as appropriate.
-- Example format:
-
-  ```
-  ---
-  "evalite": patch
-  ---
-  What changed (user-facing: new features, fixes).
-  ```
 
 - Description must be user-facing, summarizing features, additions, or fixes only.
 
