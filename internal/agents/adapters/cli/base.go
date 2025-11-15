@@ -21,11 +21,11 @@ type Adapter struct {
 	Cmd          string
 	Args         []string
 	Env          map[string]string
-	Capabilities connector.Capabilities
+	Capabilities connector.CapabilitySet
 }
 
 // Info returns static metadata for the adapter.
-func (a *Adapter) Info(ctx context.Context) (string, string, connector.Capabilities, error) {
+func (a *Adapter) Info(ctx context.Context) (string, string, connector.CapabilitySet, error) {
 	if ctx == nil {
 		ctx = context.Background()
 	}
@@ -37,11 +37,11 @@ func (a *Adapter) Info(ctx context.Context) (string, string, connector.Capabilit
 	return name, version, a.capabilities(), nil
 }
 
-func (a *Adapter) capabilities() connector.Capabilities {
+func (a *Adapter) capabilities() connector.CapabilitySet {
 	if len(a.Capabilities) > 0 {
 		return a.Capabilities
 	}
-	return connector.Capabilities{"tools": true}
+	return connector.CapabilitySet{connector.CapabilitySupportsAttachments: true}
 }
 
 // Start spawns the CLI command wired to the provided session options.
@@ -51,8 +51,8 @@ func (a *Adapter) Start(ctx context.Context, opts connector.SessionOptions) (con
 		return nil, errors.New("cmd is required")
 	}
 	cmd := exec.CommandContext(ctx, name, a.Args...)
-	if opts.WorkspaceRoot != "" {
-		cmd.Dir = opts.WorkspaceRoot
+	if opts.WorkingDirectory != "" {
+		cmd.Dir = opts.WorkingDirectory
 	}
 	env := append([]string{}, os.Environ()...)
 	env = append(env, formatEnvMap(a.Env)...)
@@ -95,16 +95,15 @@ type session struct {
 	cmd   *exec.Cmd
 	stdin io.WriteCloser
 	evts  chan connector.Event
-	caps  connector.Capabilities
+	caps  connector.CapabilitySet
 	mu    sync.Mutex
 	close sync.Once
 	wg    sync.WaitGroup
 }
 
-func (s *session) ID() string                           { return s.id }
-func (s *session) Capabilities() connector.Capabilities { return s.caps }
-func (s *session) Events() <-chan connector.Event       { return s.evts }
-func (s *session) Stdin() io.WriteCloser                { return s.stdin }
+func (s *session) ID() string                            { return s.id }
+func (s *session) Capabilities() connector.CapabilitySet { return s.caps }
+func (s *session) Events() <-chan connector.Event        { return s.evts }
 
 func (s *session) Send(ctx context.Context, prompts ...connector.Prompt) error {
 	if len(prompts) == 0 {
@@ -156,19 +155,20 @@ func (s *session) read(r io.Reader, isErr bool) {
 		line, err := reader.ReadBytes('\n')
 		if len(line) > 0 {
 			text := strings.TrimRight(string(line), "\r\n")
-			if evt, ok := tryJSONEvent(text); ok {
+			if evt, ok := parseCLIEvent(text); ok {
 				s.emit(evt)
 			} else {
-				kind := connector.EventTextChunk
-				if isErr {
-					kind = connector.EventError
-				}
-				s.emit(connector.Event{Kind: kind, At: time.Now(), Text: text})
+				s.emit(basicTextEvent(text, isErr))
 			}
 		}
 		if err != nil {
 			if !errors.Is(err, io.EOF) {
-				s.emit(connector.Event{Kind: connector.EventError, At: time.Now(), Err: err.Error()})
+				s.emit(connector.Event{
+					Type:      connector.EventTypeSessionError,
+					Timestamp: time.Now(),
+					Message:   err.Error(),
+					Error:     &connector.EventError{Message: err.Error()},
+				})
 			}
 			return
 		}
@@ -186,53 +186,167 @@ func (s *session) wait() {
 	if err != nil && !errors.Is(err, context.Canceled) {
 		msg = err.Error()
 	}
-	s.emit(connector.Event{Kind: connector.EventExit, At: time.Now(), Code: code, Err: msg})
+	evtType := connector.EventTypeCustom
+	if err != nil {
+		evtType = connector.EventTypeSessionError
+	}
+	event := connector.Event{
+		Type:      evtType,
+		Timestamp: time.Now(),
+		Message:   fmt.Sprintf("cli exited with code %d", code),
+		Metadata:  map[string]any{"exitCode": code},
+	}
+	if msg != "" {
+		event.Error = &connector.EventError{Message: msg}
+	}
+	s.emit(event)
 	close(s.evts)
 }
 
-func tryJSONEvent(line string) (connector.Event, bool) {
+func parseCLIEvent(line string) (connector.Event, bool) {
 	var raw map[string]any
 	if err := json.Unmarshal([]byte(line), &raw); err != nil {
 		return connector.Event{}, false
 	}
-	kind, _ := raw["kind"].(string)
-	if strings.TrimSpace(kind) == "" {
-		if alt, ok := raw["type"].(string); ok {
-			kind = alt
-		}
-	}
-	if strings.TrimSpace(kind) == "" {
+	typeStr := resolveCLIEventType(raw)
+	if typeStr == "" {
 		return connector.Event{}, false
 	}
-	evt := connector.Event{Kind: connector.EventKind(kind), At: time.Now(), Meta: raw}
-	if text, ok := raw["text"].(string); ok {
-		evt.Text = text
+	event := connector.Event{
+		Type:      connector.EventType(typeStr),
+		Timestamp: time.Now(),
+		Metadata:  raw,
 	}
-	if plan, ok := raw["plan"].(string); ok {
-		evt.Plan = plan
+	if msg, ok := stringField(raw, "message"); ok {
+		event.Message = msg
 	}
-	if name, ok := raw["toolName"].(string); ok {
-		evt.ToolName = name
+	if text, ok := stringField(raw, "text"); ok {
+		event.Message = text
+		if event.Payload == nil {
+			event.Payload = &connector.AgentMessage{Role: connector.PromptAuthorAssistant, Text: text}
+		}
 	}
-	if args, ok := raw["toolArgs"]; ok {
-		evt.ToolArgs = args
+	if plan, ok := stringField(raw, "plan"); ok {
+		event.Message = plan
 	}
-	if diff, ok := raw["diffUnified"].(string); ok {
-		evt.DiffUnified = diff
+	if promptID, ok := stringField(raw, "promptId"); ok {
+		event.PromptID = promptID
 	}
-	if path, ok := raw["filePath"].(string); ok {
-		evt.FilePath = path
+	if threadID, ok := stringField(raw, "threadId"); ok {
+		event.ThreadID = threadID
 	}
-	if img, ok := raw["imagePath"].(string); ok {
-		evt.ImagePath = img
+	if usage := usageFromRaw(raw); usage != nil {
+		event.Usage = usage
 	}
-	if code, ok := raw["code"].(float64); ok {
-		evt.Code = int(code)
+	if errMsg, ok := stringField(raw, "err"); ok {
+		event.Error = &connector.EventError{Message: errMsg}
 	}
-	if errMsg, ok := raw["err"].(string); ok {
-		evt.Err = errMsg
+	return event, true
+}
+
+func basicTextEvent(text string, isErr bool) connector.Event {
+	evt := connector.Event{
+		Timestamp: time.Now(),
+		Message:   text,
 	}
-	return evt, true
+	if isErr {
+		evt.Type = connector.EventTypeSessionError
+		evt.Error = &connector.EventError{Message: text}
+	} else {
+		evt.Type = connector.EventTypeItemUpdated
+		evt.Payload = &connector.AgentMessage{Role: connector.PromptAuthorAssistant, Text: text}
+	}
+	return evt
+}
+
+func resolveCLIEventType(raw map[string]any) string {
+	if t, ok := stringField(raw, "kind"); ok {
+		if mapped := mapKnownCLIType(t); mapped != "" {
+			return mapped
+		}
+		return t
+	}
+	if t, ok := stringField(raw, "type"); ok {
+		if mapped := mapKnownCLIType(t); mapped != "" {
+			return mapped
+		}
+		return t
+	}
+	return ""
+}
+
+func mapKnownCLIType(value string) string {
+	switch value {
+	case "text_chunk", "text":
+		return string(connector.EventTypeItemUpdated)
+	case "plan_update", "plan.updated":
+		return string(connector.EventTypePlanUpdated)
+	case "tool_call", "tool.started":
+		return string(connector.EventTypeToolStarted)
+	case "tool_completed":
+		return string(connector.EventTypeToolCompleted)
+	case "diff", "diff.summary":
+		return string(connector.EventTypeDiffSummary)
+	case "usage", "usage.updated":
+		return string(connector.EventTypeUsageUpdated)
+	case "error", "session.error":
+		return string(connector.EventTypeSessionError)
+	case "complete", "turn.completed":
+		return string(connector.EventTypeTurnCompleted)
+	case "start", "session.started":
+		return string(connector.EventTypeSessionStarted)
+	default:
+		return ""
+	}
+}
+
+func stringField(raw map[string]any, key string) (string, bool) {
+	if value, ok := raw[key]; ok {
+		if text, ok := value.(string); ok {
+			trimmed := strings.TrimSpace(text)
+			if trimmed != "" {
+				return trimmed, true
+			}
+		}
+	}
+	return "", false
+}
+
+func usageFromRaw(raw map[string]any) *connector.TokenUsage {
+	usageValue, ok := raw["usage"].(map[string]any)
+	if !ok || len(usageValue) == 0 {
+		return nil
+	}
+	usage := connector.TokenUsage{}
+	if v, ok := floatField(usageValue, "input"); ok {
+		usage.InputTokens = v
+	}
+	if v, ok := floatField(usageValue, "cached"); ok {
+		usage.CachedInputTokens = v
+	}
+	if v, ok := floatField(usageValue, "output"); ok {
+		usage.OutputTokens = v
+	}
+	return &usage
+}
+
+func floatField(raw map[string]any, key string) (int, bool) {
+	value, ok := raw[key]
+	if !ok {
+		return 0, false
+	}
+	switch v := value.(type) {
+	case float64:
+		return int(v), true
+	case int:
+		return v, true
+	case json.Number:
+		parsed, err := v.Int64()
+		if err == nil {
+			return int(parsed), true
+		}
+	}
+	return 0, false
 }
 
 func (s *session) emit(evt connector.Event) {

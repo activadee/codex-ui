@@ -28,7 +28,11 @@ func TestAdapterStartAndStream(t *testing.T) {
 	}
 	t.Cleanup(func() { _ = sess.Close() })
 
-	if err := sess.Send(context.Background(), connector.Prompt{Role: connector.RoleUser, Blocks: []connector.ContentBlock{{Kind: "text", Text: "hello"}}}); err != nil {
+	prompt := connector.Prompt{
+		Author:   connector.PromptAuthorUser,
+		Segments: []connector.PromptSegment{{Kind: connector.SegmentKindText, Text: "hello"}},
+	}
+	if err := sess.Send(context.Background(), prompt); err != nil {
 		t.Fatalf("send prompt: %v", err)
 	}
 
@@ -41,7 +45,7 @@ func TestAdapterStartAndStream(t *testing.T) {
 				goto done
 			}
 			seen = append(seen, evt)
-			if evt.Kind == connector.EventExit {
+			if strings.Contains(evt.Message, "cli exited") {
 				goto done
 			}
 		case <-deadline:
@@ -58,13 +62,13 @@ done:
 	foundStdout := false
 	foundStderr := false
 	for _, evt := range seen {
-		if evt.Kind == connector.EventTextChunk && strings.Contains(evt.Text, "CLI_TEST_VAR=from-adapter") {
+		if evt.Type == connector.EventTypeItemUpdated && strings.Contains(evt.Message, "CLI_TEST_VAR=from-adapter") {
 			foundEnv = true
 		}
-		if evt.Kind == connector.EventTextChunk && evt.Text == "stdout-line" {
+		if evt.Type == connector.EventTypeItemUpdated && evt.Message == "stdout-line" {
 			foundStdout = true
 		}
-		if evt.Kind == connector.EventError && evt.Text == "stderr-line" {
+		if evt.Type == connector.EventTypeSessionError && evt.Message == "stderr-line" {
 			foundStderr = true
 		}
 	}
@@ -77,21 +81,21 @@ done:
 	if !foundStderr {
 		t.Fatalf("stderr line missing: %#v", seen)
 	}
-	if exit := seen[len(seen)-1]; exit.Kind != connector.EventExit || exit.Code != 0 {
+	if exit := seen[len(seen)-1]; !strings.Contains(exit.Message, "cli exited") {
 		t.Fatalf("unexpected exit event: %#v", exit)
 	}
 }
 
-func TestTryJSONEventSupportsTypeKey(t *testing.T) {
+func TestParseCLIEventSupportsTypeKey(t *testing.T) {
 	line := `{"type":"plan_update","plan":"step"}`
-	evt, ok := tryJSONEvent(line)
+	evt, ok := parseCLIEvent(line)
 	if !ok {
 		t.Fatalf("event should parse")
 	}
-	if evt.Kind != connector.EventPlanUpdate {
-		t.Fatalf("unexpected kind %s", evt.Kind)
+	if evt.Type != connector.EventTypePlanUpdated {
+		t.Fatalf("unexpected type %s", evt.Type)
 	}
-	if evt.Plan != "step" {
+	if evt.Message != "step" {
 		t.Fatalf("unexpected payload %#v", evt)
 	}
 }
