@@ -21,7 +21,19 @@ const reasoningOptionsMap: Record<string, SelectOption[]> = {
     { label: "Medium", value: "medium" },
     { label: "High", value: "high" }
   ],
+  "gpt-5.1-codex": [
+    { label: "Minimal", value: "minimal" },
+    { label: "Low", value: "low" },
+    { label: "Medium", value: "medium" },
+    { label: "High", value: "high" }
+  ],
   "gpt-5.1-codex-mini": [
+    { label: "Medium", value: "medium" },
+    { label: "High", value: "high" }
+  ],
+  "gpt-5.1": [
+    { label: "Minimal", value: "minimal" },
+    { label: "Low", value: "low" },
     { label: "Medium", value: "medium" },
     { label: "High", value: "high" }
   ],
