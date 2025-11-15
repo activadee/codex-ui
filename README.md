@@ -26,6 +26,11 @@ to this in your browser, and you can call your Go code from devtools.
 - `internal/git/worktrees`: git worktree manager
 - `main.go`: composition root (opens DB, migrates, wires services, binds APIs)
 
+## Agent Models & Codex CLI
+
+- codex-ui targets Codex CLI `rust-v0.58.0` or newer so the GPT-5.1 family (`gpt-5.1-codex`, `gpt-5.1-codex-mini`, `gpt-5.1`) is available everywhere the composer exposes model choices.
+- The composer defaults to `gpt-5.1-codex` with a Medium reasoning level to match the upstream presets, but you can still pick legacy GPT-5 options when needed.
+
 ## Build
 
 - Generate Wails bindings: `wails generate module`
