@@ -87,6 +87,12 @@ func (s *streamPersistence) storeAgentItem(ctx context.Context, item *AgentItemD
 	}
 	s.mu.Lock()
 	s.lastActivity = &now
+	if id != "" {
+		if s.existingAgentItemIDs == nil {
+			s.existingAgentItemIDs = make(map[string]struct{})
+		}
+		s.existingAgentItemIDs[id] = struct{}{}
+	}
 	switch item.Type {
 	case entryTypeAgentMessage:
 		s.agentMessagePersisted = true
