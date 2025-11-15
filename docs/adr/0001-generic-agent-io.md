@@ -195,4 +195,4 @@ Each step can ship independently because adapters expose shims until both backen
 
 ## Acceptance
 - This ADR file checked in under `docs/adr/0001-generic-agent-io.md` with Mermaid diagrams (per user guidance).
-- Interfaces, runner goals, Codex integration, and migration plan documented; agents manifest/config specifics intentionally deferred to issue #73.
+- Interfaces, runner goals, Codex integration, agents manifest/config wiring (`agents.yaml` + `internal/config/agents.go`), and migration plan documented for downstream contributors.
