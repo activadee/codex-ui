@@ -110,6 +110,9 @@ func (s *session) Send(ctx context.Context, prompts ...connector.Prompt) error {
 	if len(prompts) == 0 {
 		return nil
 	}
+	if ctx == nil {
+		ctx = context.Background()
+	}
 	payload := struct {
 		Type    string             `json:"type"`
 		Prompts []connector.Prompt `json:"prompts"`
@@ -118,8 +121,20 @@ func (s *session) Send(ctx context.Context, prompts ...connector.Prompt) error {
 	if err != nil {
 		return err
 	}
-	_, err = s.stdin.Write(append(data, '\n'))
-	return err
+	done := make(chan error, 1)
+	go func(payload []byte) {
+		s.mu.Lock()
+		defer s.mu.Unlock()
+		_, writeErr := s.stdin.Write(payload)
+		done <- writeErr
+	}(append(data, '\n'))
+	select {
+	case err := <-done:
+		return err
+	case <-ctx.Done():
+		_ = s.Close()
+		return ctx.Err()
+	}
 }
 
 func (s *session) Close() error {
@@ -136,19 +151,27 @@ func (s *session) Close() error {
 
 func (s *session) read(r io.Reader, isErr bool) {
 	defer s.wg.Done()
-	scanner := bufio.NewScanner(r)
-	scanner.Buffer(make([]byte, 0, 64*1024), 2*1024*1024)
-	for scanner.Scan() {
-		line := scanner.Text()
-		if evt, ok := tryJSONEvent(line); ok {
-			s.emit(evt)
-			continue
+	reader := bufio.NewReader(r)
+	for {
+		line, err := reader.ReadBytes('\n')
+		if len(line) > 0 {
+			text := strings.TrimRight(string(line), "\r\n")
+			if evt, ok := tryJSONEvent(text); ok {
+				s.emit(evt)
+			} else {
+				kind := connector.EventTextChunk
+				if isErr {
+					kind = connector.EventError
+				}
+				s.emit(connector.Event{Kind: kind, At: time.Now(), Text: text})
+			}
 		}
-		kind := connector.EventTextChunk
-		if isErr {
-			kind = connector.EventError
+		if err != nil {
+			if !errors.Is(err, io.EOF) {
+				s.emit(connector.Event{Kind: connector.EventError, At: time.Now(), Err: err.Error()})
+			}
+			return
 		}
-		s.emit(connector.Event{Kind: kind, At: time.Now(), Text: line})
 	}
 }
 
