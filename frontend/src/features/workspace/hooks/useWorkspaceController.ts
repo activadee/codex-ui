@@ -36,8 +36,15 @@ export function useWorkspaceController() {
   } = useAgentThreads(projectId)
 
   const conversationManager = useConversationManager({ threads, setThreads })
-  const { sections, appendUserEntry, upsertAgentEntry, appendSystemEntry, ensureTimeline, syncThreadPreviewFromConversation } =
-    conversationManager
+  const {
+    sections,
+    appendUserEntry,
+    upsertAgentEntry,
+    appendSystemEntry,
+    ensureTimeline,
+    resetAgentEntries,
+    syncThreadPreviewFromConversation
+  } = conversationManager
 
   const { activeThread, setActiveThread, threadId, selectedThread, handleThreadSelect } = useThreadSelection(projectId)
   const { entries: conversationEntries } = useThreadConversation(threadId)
@@ -47,6 +54,7 @@ export function useWorkspaceController() {
     appendSystemEntry,
     upsertAgentEntry,
     ensureTimeline,
+    resetAgentEntries,
     appendUserEntry,
     refreshThread,
     setActiveThread,

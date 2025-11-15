@@ -1,4 +1,4 @@
-import { useCallback, useMemo } from "react"
+import { useCallback, useMemo, useRef } from "react"
 
 import { formatThreadSections, updateThreadPreview } from "@/domain/threads"
 import { useAppStore, useAppStoreApi } from "@/state/createAppStore"
@@ -19,6 +19,7 @@ export type ConversationManager = {
   upsertAgentEntry: (threadId: number, item: AgentItemPayload) => void
   appendSystemEntry: (threadId: number, entry: SystemConversationEntry) => void
   ensureTimeline: (threadId: number) => void
+  resetAgentEntries: (threadId: number) => void
   syncThreadPreviewFromConversation: (threadId: number) => void
   getConversationEntries: (threadId: number) => ConversationEntry[]
   setThreads: (updater: (threads: AgentThread[]) => AgentThread[]) => void
@@ -33,6 +34,33 @@ export function useConversationManager(options: {
   const ensureConversation = useAppStore((state) => state.ensureConversation)
   const updateConversationEntries = useAppStore((state) => state.updateConversationEntries)
   const loadConversationState = useAppStore((state) => state.loadConversation)
+  const liveAgentEntryIdsRef = useRef(new Map<number, Set<string>>())
+
+  const resetAgentEntries = useCallback((threadId: number) => {
+    if (threadId <= 0) {
+      return
+    }
+    liveAgentEntryIdsRef.current.set(threadId, new Set())
+  }, [])
+
+  const markAgentEntryLive = useCallback((threadId: number, identifier: string) => {
+    if (threadId <= 0 || !identifier) {
+      return
+    }
+    const current = liveAgentEntryIdsRef.current.get(threadId)
+    if (current) {
+      current.add(identifier)
+      return
+    }
+    liveAgentEntryIdsRef.current.set(threadId, new Set([identifier]))
+  }, [])
+
+  const isAgentEntryLive = useCallback((threadId: number, identifier: string) => {
+    if (threadId <= 0 || !identifier) {
+      return false
+    }
+    return liveAgentEntryIdsRef.current.get(threadId)?.has(identifier) ?? false
+  }, [])
 
   const applyThreadPreview = useCallback(
     (threadId: number, text: string, timestamp: string) => {
@@ -139,7 +167,7 @@ export function useConversationManager(options: {
       ensureTimeline(threadId)
       updateEntries(threadId, (existing) => {
         const index = existing.findIndex((entry) => entry.role === "agent" && entry.id === identifier)
-        if (index >= 0) {
+        if (index >= 0 && isAgentEntryLive(threadId, identifier)) {
           const current = existing[index] as AgentConversationEntry
           const nextEntry: AgentConversationEntry = {
             ...current,
@@ -148,6 +176,7 @@ export function useConversationManager(options: {
           }
           const nextList = [...existing]
           nextList[index] = nextEntry
+          markAgentEntryLive(threadId, identifier)
           return nextList
         }
         const nextEntry: AgentConversationEntry = {
@@ -157,6 +186,7 @@ export function useConversationManager(options: {
           updatedAt: timestamp,
           item: { ...item, id: identifier }
         }
+        markAgentEntryLive(threadId, identifier)
         return [...existing, nextEntry]
       })
 
@@ -164,7 +194,7 @@ export function useConversationManager(options: {
         applyThreadPreview(threadId, item.text, timestamp)
       }
     },
-    [applyThreadPreview, ensureTimeline, updateEntries]
+    [applyThreadPreview, ensureTimeline, isAgentEntryLive, markAgentEntryLive, updateEntries]
   )
 
   const appendSystemEntry = useCallback(
@@ -195,6 +225,7 @@ export function useConversationManager(options: {
     upsertAgentEntry,
     appendSystemEntry,
     ensureTimeline,
+    resetAgentEntries,
     syncThreadPreviewFromConversation,
     getConversationEntries,
     setThreads

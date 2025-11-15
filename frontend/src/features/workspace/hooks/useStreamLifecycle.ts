@@ -27,6 +27,7 @@ export type StreamLifecycleOptions = {
   setActiveThread: (thread: ThreadListItem | null) => void
   syncThreadPreviewFromConversation: (threadId: number) => void
   updateStreamError: (message: string | null, threadId?: number) => void
+  resetAgentEntries: (threadId: number) => void
   pendingAttachmentsRef: React.MutableRefObject<Map<string, string[]>>
 }
 
@@ -41,6 +42,7 @@ export function useStreamLifecycle(options: StreamLifecycleOptions) {
     setActiveThread,
     syncThreadPreviewFromConversation,
     updateStreamError,
+    resetAgentEntries,
     pendingAttachmentsRef
   } = options
 
@@ -53,6 +55,7 @@ export function useStreamLifecycle(options: StreamLifecycleOptions) {
       ensureTimeline(targetThreadId)
 
       if (event.type === "turn.started") {
+        resetAgentEntries(targetThreadId)
         appendSystemEntry(targetThreadId, {
           id: `system-${Date.now().toString(36)}`,
           role: "system",
