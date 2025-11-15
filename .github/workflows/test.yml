@@ -8,6 +8,6 @@ on:
 
 jobs:
   test:
-    uses: activadee/codex-shared-workflows/.github/workflows/go-tests.yml@main
+    uses: activadee/codex-shared-workflows/workflows/go-tests.yml@main
     with:
       pre_test: mkdir -p frontend/dist && touch frontend/dist/.placeholder
