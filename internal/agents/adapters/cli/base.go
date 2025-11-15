@@ -9,8 +9,10 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"codex-ui/internal/agents/connector"
@@ -18,10 +20,33 @@ import (
 
 // Adapter launches a CLI agent command and exposes connector semantics.
 type Adapter struct {
-	Cmd          string
-	Args         []string
-	Env          map[string]string
-	Capabilities connector.CapabilitySet
+	Identifier       string
+	Cmd              string
+	Args             []string
+	Env              map[string]string
+	BaseCapabilities connector.CapabilitySet
+}
+
+// ID returns a stable identifier for registry lookups.
+func (a *Adapter) ID() string {
+	if trimmed := strings.TrimSpace(a.Identifier); trimmed != "" {
+		return trimmed
+	}
+	name := strings.TrimSpace(a.Cmd)
+	if name == "" {
+		return "cli"
+	}
+	base := filepath.Base(name)
+	if base == "" {
+		base = name
+	}
+	sanitized := strings.ReplaceAll(base, " ", "-")
+	return "cli:" + sanitized
+}
+
+// Capabilities returns the advertised feature set for this adapter.
+func (a *Adapter) Capabilities() connector.CapabilitySet {
+	return a.capabilities()
 }
 
 // Info returns static metadata for the adapter.
@@ -38,8 +63,8 @@ func (a *Adapter) Info(ctx context.Context) (string, string, connector.Capabilit
 }
 
 func (a *Adapter) capabilities() connector.CapabilitySet {
-	if len(a.Capabilities) > 0 {
-		return a.Capabilities
+	if len(a.BaseCapabilities) > 0 {
+		return a.BaseCapabilities.Clone()
 	}
 	return connector.CapabilitySet{connector.CapabilitySupportsAttachments: true}
 }
@@ -80,11 +105,12 @@ func (a *Adapter) Start(ctx context.Context, opts connector.SessionOptions) (con
 	}
 
 	sess := &session{
-		id:    fmt.Sprintf("cli-%d", time.Now().UnixNano()),
-		cmd:   cmd,
-		stdin: stdin,
-		evts:  make(chan connector.Event, 256),
-		caps:  a.capabilities(),
+		id:      fmt.Sprintf("cli-%d", time.Now().UnixNano()),
+		cmd:     cmd,
+		stdin:   stdin,
+		evts:    make(chan connector.Event, 256),
+		caps:    a.capabilities(),
+		stopped: atomic.Bool{},
 	}
 	sess.wg.Add(2)
 	go sess.read(stdout, false)
@@ -94,14 +120,15 @@ func (a *Adapter) Start(ctx context.Context, opts connector.SessionOptions) (con
 }
 
 type session struct {
-	id    string
-	cmd   *exec.Cmd
-	stdin io.WriteCloser
-	evts  chan connector.Event
-	caps  connector.CapabilitySet
-	mu    sync.Mutex
-	close sync.Once
-	wg    sync.WaitGroup
+	id      string
+	cmd     *exec.Cmd
+	stdin   io.WriteCloser
+	evts    chan connector.Event
+	caps    connector.CapabilitySet
+	mu      sync.Mutex
+	close   sync.Once
+	wg      sync.WaitGroup
+	stopped atomic.Bool
 }
 
 func (s *session) ID() string                            { return s.id }
@@ -141,6 +168,7 @@ func (s *session) Send(ctx context.Context, prompts ...connector.Prompt) error {
 
 func (s *session) Close() error {
 	s.close.Do(func() {
+		s.stopped.Store(true)
 		if s.stdin != nil {
 			_ = s.stdin.Close()
 		}
@@ -165,6 +193,9 @@ func (s *session) read(r io.Reader, isErr bool) {
 			}
 		}
 		if err != nil {
+			if s.stopped.Load() {
+				return
+			}
 			if !errors.Is(err, io.EOF) {
 				s.emit(connector.Event{
 					Type:      connector.EventTypeSessionError,
@@ -181,12 +212,18 @@ func (s *session) read(r io.Reader, isErr bool) {
 func (s *session) wait() {
 	err := s.cmd.Wait()
 	s.wg.Wait()
+	stopped := s.stopped.Load()
+	if err != nil {
+		if stopped || errors.Is(err, context.Canceled) {
+			err = nil
+		}
+	}
 	code := 0
 	if s.cmd.ProcessState != nil {
 		code = s.cmd.ProcessState.ExitCode()
 	}
 	msg := ""
-	if err != nil && !errors.Is(err, context.Canceled) {
+	if err != nil {
 		msg = err.Error()
 	}
 	evtType := connector.EventTypeCustom
@@ -198,6 +235,9 @@ func (s *session) wait() {
 		Timestamp: time.Now(),
 		Message:   fmt.Sprintf("cli exited with code %d", code),
 		Metadata:  map[string]any{"exitCode": code},
+	}
+	if stopped {
+		event.Metadata["stopped"] = true
 	}
 	if msg != "" {
 		event.Error = &connector.EventError{Message: msg}
