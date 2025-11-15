@@ -1,4 +1,5 @@
-import { useMemo } from "react"
+
+import type { MutableRefObject } from "react"
 
 import { useAgentStream } from "@/features/streams/hooks/useAgentStream"
 import { threadToListItem } from "@/domain/threads"
@@ -27,7 +28,7 @@ export type StreamLifecycleOptions = {
   setActiveThread: (thread: ThreadListItem | null) => void
   syncThreadPreviewFromConversation: (threadId: number) => void
   updateStreamError: (message: string | null, threadId?: number) => void
-  pendingAttachmentsRef: React.MutableRefObject<Map<string, string[]>>
+  pendingAttachmentsRef: MutableRefObject<Map<string, string[]>>
 }
 
 export function useStreamLifecycle(options: StreamLifecycleOptions) {
@@ -125,7 +126,7 @@ export function useStreamLifecycle(options: StreamLifecycleOptions) {
     }
   })
 
-  const threadStreamState = useMemo(() => getThreadState(activeThreadId ?? undefined), [activeThreadId, getThreadState])
+  const threadStreamState = getThreadState(activeThreadId ?? undefined)
 
   return {
     startStream,
