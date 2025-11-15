@@ -7,6 +7,37 @@ import type {
   UserMessageSegment
 } from "@/types/app"
 
+function parseTimestamp(value?: string | null) {
+  if (!value) {
+    return 0
+  }
+  const parsed = Date.parse(value)
+  return Number.isNaN(parsed) ? 0 : parsed
+}
+
+function compareConversationEntries(a: ConversationEntry, b: ConversationEntry) {
+  const createdDiff = parseTimestamp(a.createdAt) - parseTimestamp(b.createdAt)
+  if (createdDiff !== 0) {
+    return createdDiff
+  }
+
+  const updatedDiff =
+    parseTimestamp("updatedAt" in a ? (a as AgentConversationEntry).updatedAt : a.createdAt) -
+    parseTimestamp("updatedAt" in b ? (b as AgentConversationEntry).updatedAt : b.createdAt)
+  if (updatedDiff !== 0) {
+    return updatedDiff
+  }
+
+  return a.id.localeCompare(b.id)
+}
+
+export function sortConversationEntries(entries: ConversationEntry[]): ConversationEntry[] {
+  if (entries.length <= 1) {
+    return entries.slice()
+  }
+  return [...entries].sort(compareConversationEntries)
+}
+
 function cloneAgentItem(item: AgentItemPayload | undefined): AgentItemPayload {
   if (!item) {
     return { id: "", type: "agent_message", text: "" }
@@ -15,7 +46,7 @@ function cloneAgentItem(item: AgentItemPayload | undefined): AgentItemPayload {
 }
 
 export function normaliseConversation(entries: any[]): ConversationEntry[] {
-  return entries.map((entry) => {
+  const normalized = entries.map((entry) => {
     if (entry.role === "agent") {
       const cloned = cloneAgentItem(entry.item)
       return {
@@ -53,4 +84,5 @@ export function normaliseConversation(entries: any[]): ConversationEntry[] {
       meta: entry.meta ?? {}
     } satisfies SystemConversationEntry
   })
+  return sortConversationEntries(normalized)
 }

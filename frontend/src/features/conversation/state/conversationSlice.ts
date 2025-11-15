@@ -1,6 +1,6 @@
 import type { StateCreator } from "zustand"
 
-import { normaliseConversation } from "@/domain/conversation"
+import { normaliseConversation, sortConversationEntries } from "@/domain/conversation"
 import type { PlatformBridge } from "@/platform/wailsBridge"
 import type { ConversationEntry } from "@/types/app"
 
@@ -74,7 +74,7 @@ export const createConversationSlice = (
       }
       set((state) => {
         const existing = state.conversationByThreadId[threadId] ?? []
-        const nextEntries = updater(existing)
+        const nextEntries = sortConversationEntries(updater(existing))
         return {
           ...state,
           conversationByThreadId: { ...state.conversationByThreadId, [threadId]: nextEntries }

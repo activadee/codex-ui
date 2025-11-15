@@ -38,6 +38,18 @@ describe("conversationSlice", () => {
     expect(store.getState().loadedConversationByThreadId[5]).toBe(true)
   })
 
+  it("sorts loaded conversations chronologically", async () => {
+    mock.threads.loadConversation.mockResolvedValueOnce([
+      { id: "b", role: "user", createdAt: "2024-02-02T12:00:00Z", text: "later" },
+      { id: "a", role: "user", createdAt: "2024-02-01T12:00:00Z", text: "earlier" }
+    ])
+
+    const entries = await store.getState().loadConversation(7)
+
+    expect(entries.map((entry) => entry.id)).toEqual(["a", "b"])
+    expect(store.getState().conversationByThreadId[7].map((entry) => entry.id)).toEqual(["a", "b"])
+  })
+
   it("allows updating entries via updater", () => {
     store.getState().ensureConversation(9)
     store.getState().updateConversationEntries(9, () => [
@@ -45,6 +57,16 @@ describe("conversationSlice", () => {
     ])
 
     expect(store.getState().conversationByThreadId[9]).toHaveLength(1)
+  })
+
+  it("sorts updater results to keep chronology", () => {
+    store.getState().ensureConversation(10)
+    store.getState().updateConversationEntries(10, () => [
+      { id: "newer", role: "user", createdAt: "2024-03-02T00:00:00Z", text: "new" },
+      { id: "older", role: "user", createdAt: "2024-03-01T00:00:00Z", text: "old" }
+    ])
+
+    expect(store.getState().conversationByThreadId[10].map((entry) => entry.id)).toEqual(["older", "newer"])
   })
 })
 
