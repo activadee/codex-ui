@@ -29,6 +29,7 @@ to this in your browser, and you can call your Go code from devtools.
 ## Agent Registry & Models
 
 - `agents.yaml` (repo root) defines every available agent with the same keys the registry consumes (`id`, `name`, `backend`, `cmd`/`args`/`env` for CLI adapters, `model` for SDK-backed agents). Update this manifest and restart the app to add or tweak agents without recompiling.
+- `internal/config/agents.go` loads the manifest and expands `${VAR}` tokens in `env` entries using the host environment so secrets stay outside source control while configs remain declarative.
 - The default manifest registers `codex_godex` (Codex SDK via `godex`) and `codex_cli` (local `codex exec --json` runner that forwards `CODEX_API_KEY`), so you can keep both SDK and CLI paths side-by-side.
 - Codex CLI support still targets `rust-v0.58.0` or newer so the GPT-5.1 family (`gpt-5.1-codex`, `gpt-5.1-codex-mini`, `gpt-5.1`) is available wherever the composer exposes model choices.
 - The composer defaults to `gpt-5.1-codex` with a Medium reasoning level to match the upstream presets, but you can still pick legacy GPT-5 options when needed.
