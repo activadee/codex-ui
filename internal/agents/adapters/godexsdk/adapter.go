@@ -2,19 +2,29 @@ package godexsdk
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
+	"mime"
+	"net/http"
+	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"time"
+	"unicode/utf8"
 
 	"github.com/activadee/godex"
 
 	"codex-ui/internal/agents/connector"
 )
 
-const defaultModel = "gpt-5"
+const (
+	defaultModel             = "gpt-5"
+	maxAttachmentSnippetSize = 512 * 1024 // 512KiB safety cap
+)
 
 var capabilityDefaults = connector.CapabilitySet{
 	connector.CapabilitySupportsImages:        true,
@@ -112,7 +122,10 @@ func (s *session) Send(ctx context.Context, prompts ...connector.Prompt) error {
 		ctx = context.Background()
 	}
 
-	segments, fallback := promptsToInputs(prompts)
+	segments, fallback, err := promptsToInputs(prompts)
+	if err != nil {
+		return err
+	}
 	if len(segments) == 0 && strings.TrimSpace(fallback) == "" {
 		return errors.New("prompt has no content")
 	}
@@ -147,11 +160,17 @@ func (s *session) Send(ctx context.Context, prompts ...connector.Prompt) error {
 	}
 
 	s.stateMu.Lock()
+	if s.closed {
+		s.running = false
+		s.stateMu.Unlock()
+		_ = result.Close()
+		return errors.New("session closed")
+	}
 	current := result
 	s.current = &current
+	s.wg.Add(1)
 	s.stateMu.Unlock()
 
-	s.wg.Add(1)
 	go s.consume(result)
 	return nil
 }
@@ -352,7 +371,7 @@ func metadataString(meta map[string]any, key string) string {
 	}
 }
 
-func promptsToInputs(prompts []connector.Prompt) ([]godex.InputSegment, string) {
+func promptsToInputs(prompts []connector.Prompt) ([]godex.InputSegment, string, error) {
 	var segments []godex.InputSegment
 	var fallback []string
 	for _, prompt := range prompts {
@@ -368,6 +387,12 @@ func promptsToInputs(prompts []connector.Prompt) ([]godex.InputSegment, string) 
 				if segment.Text != "" {
 					segments = append(segments, godex.TextSegment(segment.Text))
 				}
+			case connector.SegmentKindAttachmentRef:
+				converted, err := attachmentSegments(segment)
+				if err != nil {
+					return nil, "", err
+				}
+				segments = append(segments, converted...)
 			default:
 				if segment.Text != "" {
 					fallback = append(fallback, segment.Text)
@@ -376,9 +401,9 @@ func promptsToInputs(prompts []connector.Prompt) ([]godex.InputSegment, string) 
 		}
 	}
 	if len(segments) > 0 {
-		return segments, ""
+		return segments, "", nil
 	}
-	return nil, strings.Join(fallback, "\n\n")
+	return nil, strings.Join(fallback, "\n\n"), nil
 }
 
 func codeBlock(lang, body string) string {
@@ -387,6 +412,174 @@ func codeBlock(lang, body string) string {
 		return fmt.Sprintf("```\n%s\n```", body)
 	}
 	return fmt.Sprintf("```%s\n%s\n```", trimmed, body)
+}
+
+func attachmentSegments(segment connector.PromptSegment) ([]godex.InputSegment, error) {
+	path := strings.TrimSpace(segment.Path)
+	if path == "" {
+		return nil, fmt.Errorf("attachment path is empty")
+	}
+	info, err := os.Stat(path)
+	if err != nil {
+		return nil, fmt.Errorf("stat attachment %q: %w", path, err)
+	}
+	mimeType := attachmentMime(segment.Meta, path)
+	if strings.HasPrefix(mimeType, "image/") {
+		return []godex.InputSegment{godex.LocalImageSegment(path)}, nil
+	}
+	data, truncated, err := readAttachmentSnippet(path)
+	if err != nil {
+		return nil, fmt.Errorf("read attachment %q: %w", path, err)
+	}
+	if mimeType == "" && len(data) > 0 {
+		mimeType = http.DetectContentType(data)
+	}
+	if mimeType == "" {
+		mimeType = "application/octet-stream"
+	}
+	var text string
+	if isTextLike(mimeType, data) {
+		text = formatTextAttachment(path, mimeType, data, truncated)
+	} else {
+		text = formatBinaryAttachment(path, mimeType, info.Size(), data, truncated)
+	}
+	return []godex.InputSegment{godex.TextSegment(text)}, nil
+}
+
+func attachmentMime(meta map[string]any, path string) string {
+	if value := metadataString(meta, "mime"); value != "" {
+		return value
+	}
+	if value := metadataString(meta, "mimeType"); value != "" {
+		return value
+	}
+	if value := metadataString(meta, "contentType"); value != "" {
+		return value
+	}
+	ext := strings.ToLower(filepath.Ext(path))
+	if ext == "" {
+		return ""
+	}
+	if !strings.HasPrefix(ext, ".") {
+		ext = "." + ext
+	}
+	return mime.TypeByExtension(ext)
+}
+
+func readAttachmentSnippet(path string) ([]byte, bool, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return nil, false, err
+	}
+	defer f.Close()
+	reader := io.LimitReader(f, maxAttachmentSnippetSize+1)
+	data, err := io.ReadAll(reader)
+	if err != nil {
+		return nil, false, err
+	}
+	truncated := len(data) > maxAttachmentSnippetSize
+	if truncated {
+		data = data[:maxAttachmentSnippetSize]
+	}
+	return data, truncated, nil
+}
+
+func isTextLike(mimeType string, data []byte) bool {
+	if strings.HasPrefix(mimeType, "text/") || mimeType == "application/json" || mimeType == "application/xml" {
+		return true
+	}
+	if len(data) == 0 {
+		return true
+	}
+	if !utf8.Valid(data) {
+		return false
+	}
+	for _, b := range data {
+		if b == 0 {
+			return false
+		}
+	}
+	return true
+}
+
+func formatTextAttachment(path, mimeType string, data []byte, truncated bool) string {
+	name := filepath.Base(path)
+	body := string(data)
+	lang := attachmentLanguageFromPath(path)
+	if lang == "" {
+		lang = metadataLanguageHint(mimeType)
+	}
+	text := fmt.Sprintf("Attachment %s (%s)", name, mimeType)
+	if truncated {
+		text += fmt.Sprintf(" – showing first %d bytes", maxAttachmentSnippetSize)
+	}
+	return text + "\n" + codeBlock(lang, body)
+}
+
+func formatBinaryAttachment(path, mimeType string, total int64, data []byte, truncated bool) string {
+	name := filepath.Base(path)
+	encoded := base64.StdEncoding.EncodeToString(data)
+	text := fmt.Sprintf("Attachment %s (%s, %d bytes)", name, mimeType, total)
+	if truncated {
+		text += fmt.Sprintf(" – included first %d bytes", len(data))
+	}
+	return text + "\n" + encoded
+}
+
+func attachmentLanguageFromPath(path string) string {
+	switch strings.ToLower(filepath.Ext(path)) {
+	case ".go":
+		return "go"
+	case ".py":
+		return "python"
+	case ".js":
+		return "javascript"
+	case ".ts":
+		return "typescript"
+	case ".rs":
+		return "rust"
+	case ".java":
+		return "java"
+	case ".rb":
+		return "ruby"
+	case ".php":
+		return "php"
+	case ".cs":
+		return "csharp"
+	case ".cpp":
+		return "cpp"
+	case ".c":
+		return "c"
+	case ".swift":
+		return "swift"
+	case ".kt":
+		return "kotlin"
+	case ".sql":
+		return "sql"
+	case ".sh":
+		return "bash"
+	case ".json":
+		return "json"
+	case ".yaml", ".yml":
+		return "yaml"
+	default:
+		return ""
+	}
+}
+
+func metadataLanguageHint(mimeType string) string {
+	switch mimeType {
+	case "application/json":
+		return "json"
+	case "application/xml", "text/xml":
+		return "xml"
+	case "text/html":
+		return "html"
+	case "text/css":
+		return "css"
+	default:
+		return ""
+	}
 }
 
 func convertThreadEvent(event godex.ThreadEvent, threadID string) connector.Event {

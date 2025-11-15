@@ -2,6 +2,8 @@ package godexsdk
 
 import (
 	"encoding/json"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -57,7 +59,10 @@ func TestPromptsToInputsPrefersSegments(t *testing.T) {
 			{Kind: connector.SegmentKindCode, Text: "fmt.Println(\"hi\")", Lang: "go"},
 		},
 	}}
-	segments, fallback := promptsToInputs(prompts)
+	segments, fallback, err := promptsToInputs(prompts)
+	if err != nil {
+		t.Fatalf("promptsToInputs returned error: %v", err)
+	}
 	if fallback != "" {
 		t.Fatalf("expected empty fallback, got %q", fallback)
 	}
@@ -66,6 +71,33 @@ func TestPromptsToInputsPrefersSegments(t *testing.T) {
 	}
 	if segments[1].Text == "" || !strings.Contains(segments[1].Text, "```go") {
 		t.Fatalf("expected code block formatting, got %q", segments[1].Text)
+	}
+}
+
+func TestPromptsToInputsHandlesAttachmentRef(t *testing.T) {
+	dir := t.TempDir()
+	file := filepath.Join(dir, "notes.txt")
+	content := "hello from attachment"
+	if err := os.WriteFile(file, []byte(content), 0o600); err != nil {
+		t.Fatalf("write attachment: %v", err)
+	}
+	prompts := []connector.Prompt{{
+		Segments: []connector.PromptSegment{
+			{Kind: connector.SegmentKindAttachmentRef, Path: file},
+		},
+	}}
+	segments, fallback, err := promptsToInputs(prompts)
+	if err != nil {
+		t.Fatalf("promptsToInputs returned error: %v", err)
+	}
+	if fallback != "" {
+		t.Fatalf("expected empty fallback, got %q", fallback)
+	}
+	if len(segments) != 1 {
+		t.Fatalf("expected one segment, got %d", len(segments))
+	}
+	if !strings.Contains(segments[0].Text, content) {
+		t.Fatalf("expected attachment content in output, got %q", segments[0].Text)
 	}
 }
 
