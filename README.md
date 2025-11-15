@@ -38,3 +38,9 @@ to this in your browser, and you can call your Go code from devtools.
 - The workflow now triggers automatically on `pull_request` events (`opened`, `synchronize`, `reopened`) when the actor matches the repository owner, so repo-owned branches get doc checks without leaving comments.
 - Maintainers can also press **Run workflow** from the Actions tab (the workflow has `workflow_dispatch` enabled) to retrigger the sync for community PRs or after manual fixes.
 - `doc_globs` is pinned to `README.md`, `AGENTS.md`, and `docs/**/*.md`, and the job has `contents` + `pull-requests` write permissions so it can commit `[skip ci][doc-sync]` updates directly back to the PR branch.
+
+## Issue Plan Workflow
+
+- `.github/workflows/issue-plan.yml` reuses `activadee/codex-shared-workflows/.github/workflows/issue-plan.yml@main` to generate Codex implementation plans directly on issues.
+- It listens for `issues` events when a label is added, but only runs if the label is exactly `codex-plan` and the actor applying it is the repository owner. This keeps plan comments limited to maintainer-approved prompts.
+- The job inherits repo secrets so it can post back to the originating issue without additional configuration.
