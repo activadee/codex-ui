@@ -39,7 +39,7 @@ to this in your browser, and you can call your Go code from devtools.
 
 ## Doc Sync Workflow
 
-- `.github/workflows/doc-sync.yml` runs the shared `activadee/codex-doc-sync` job to keep Markdown + `docs/**` files aligned with each PR.
+- `.github/workflows/doc-sync.yml` reuses `activadee/codex-shared-workflows/.github/workflows/doc-sync.yml@main` to keep Markdown + `docs/**` files aligned with each PR.
 - The workflow now triggers automatically on `pull_request` events (`opened`, `synchronize`, `reopened`) when the actor matches the repository owner, so repo-owned branches get doc checks without leaving comments.
 - Maintainers can also press **Run workflow** from the Actions tab (the workflow has `workflow_dispatch` enabled) to retrigger the sync for community PRs or after manual fixes.
-- The job has `contents` + `pull-requests` write permissions so it can commit `[skip ci][doc-sync]` updates directly back to the PR branch.
+- `doc_globs` is pinned to `README.md`, `AGENTS.md`, and `docs/**/*.md`, and the job has `contents` + `pull-requests` write permissions so it can commit `[skip ci][doc-sync]` updates directly back to the PR branch.

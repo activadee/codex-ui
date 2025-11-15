@@ -1,0 +1,27 @@
+diff --git a/.github/workflows/doc-sync.yml b/.github/workflows/doc-sync.yml
+new file mode 100644
+index 0000000..1af7473
+--- /dev/null
++++ b/.github/workflows/doc-sync.yml
+@@ -0,0 +1,21 @@
++name: Doc Sync On Command
++permissions:
++  contents: write
++  pull-requests: write
++on:
++  workflow_dispatch:
++  pull_request:
++    types: [opened, synchronize, reopened]
++
++jobs:
++  doc-sync:
++    if: >
++      github.event_name == 'workflow_dispatch' ||
++      (github.event_name == 'pull_request' && github.actor == github.repository_owner)
++    uses: activadee/codex-shared-workflows/.github/workflows/doc-sync.yml@main
++    secrets: inherit
++    with:
++      doc_globs: |
++        README.md
++        AGENTS.md
++        docs/**/*.md

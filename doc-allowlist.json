@@ -1,0 +1,23 @@
+[
+  "AGENTS.md",
+  "README.md",
+  "docs/adr/0001-generic-agent-io.md",
+  "docs/components/files-panel.md",
+  "docs/components/manage-project-dialog.md",
+  "docs/components/project-sidebar.md",
+  "docs/components/thread-terminal.md",
+  "docs/components/workspace-shell.md",
+  "docs/features/conversation.md",
+  "docs/features/diffs.md",
+  "docs/features/projects.md",
+  "docs/features/streams.md",
+  "docs/features/terminal.md",
+  "docs/features/threads.md",
+  "docs/features/workspace.md",
+  "docs/routes/new-thread-route.md",
+  "docs/routes/project-landing.md",
+  "docs/routes/thread-route.md",
+  "docs/routes/workspace-context.md",
+  "docs/routes/workspace-landing.md",
+  "docs/routes/workspace-layout.md"
+]
