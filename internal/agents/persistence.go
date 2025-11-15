@@ -1,13 +1,14 @@
 package agents
 
 import (
-    "context"
-    "io/fs"
-    "os"
-    "path/filepath"
-    "strings"
-    "sync"
-    "time"
+	"context"
+	"encoding/json"
+	"io/fs"
+	"os"
+	"path/filepath"
+	"strings"
+	"sync"
+	"time"
 
     "codex-ui/internal/storage/discovery"
 )
@@ -17,6 +18,8 @@ type streamPersistence struct {
 	thread discovery.Thread
 
 	mu                      sync.Mutex
+	agentItemsLoaded        bool
+	existingAgentItemIDs    map[string]struct{}
 	externalID              string
 	finalStatus             discovery.ThreadStatus
 	lastActivity            *time.Time
@@ -63,6 +66,10 @@ func (s *streamPersistence) storeAgentItem(ctx context.Context, item *AgentItemD
 	if item == nil {
 		return nil
 	}
+	id := strings.TrimSpace(item.ID)
+	if id != "" && s.hasPersistedAgentItem(ctx, id) {
+		return nil
+	}
 	payload, err := marshalAgentItemPayload(item)
 	if err != nil {
 		return nil
@@ -101,6 +108,52 @@ func (s *streamPersistence) storeAgentItem(ctx context.Context, item *AgentItemD
 	}
 	s.mu.Unlock()
 	return &now
+}
+
+func (s *streamPersistence) hasPersistedAgentItem(ctx context.Context, id string) bool {
+	s.ensureExistingAgentItems(ctx)
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if len(s.existingAgentItemIDs) == 0 {
+		return false
+	}
+	_, ok := s.existingAgentItemIDs[id]
+	return ok
+}
+
+func (s *streamPersistence) ensureExistingAgentItems(ctx context.Context) {
+	s.mu.Lock()
+	if s.agentItemsLoaded {
+		s.mu.Unlock()
+		return
+	}
+	s.mu.Unlock()
+
+	entries, err := s.repo.ListConversationEntries(ctx, s.thread.ID)
+	cache := make(map[string]struct{})
+	if err == nil {
+		for _, entry := range entries {
+			if entry.Role != "agent" || len(entry.Payload) == 0 {
+				continue
+			}
+			var payload AgentItemDTO
+			if uerr := json.Unmarshal(entry.Payload, &payload); uerr != nil {
+				continue
+			}
+			if trimmed := strings.TrimSpace(payload.ID); trimmed != "" {
+				cache[trimmed] = struct{}{}
+			}
+		}
+	}
+
+	s.mu.Lock()
+	if err == nil {
+		s.existingAgentItemIDs = cache
+	} else if s.existingAgentItemIDs == nil {
+		s.existingAgentItemIDs = make(map[string]struct{})
+	}
+	s.agentItemsLoaded = true
+	s.mu.Unlock()
 }
 
 func (s *streamPersistence) recordStatus(status discovery.ThreadStatus) {
