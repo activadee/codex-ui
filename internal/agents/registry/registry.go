@@ -3,6 +3,7 @@ package registry
 import (
 	"context"
 	"fmt"
+	"sort"
 
 	ccli "codex-ui/internal/agents/adapters/cli"
 	cgdx "codex-ui/internal/agents/adapters/godexsdk"
@@ -63,8 +64,14 @@ func (r *Registry) Info(ctx context.Context) ([]map[string]any, error) {
 	if r == nil {
 		return nil, fmt.Errorf("registry not initialised")
 	}
-	infos := make([]map[string]any, 0, len(r.entries))
-	for _, entry := range r.entries {
+	keys := make([]string, 0, len(r.entries))
+	for id := range r.entries {
+		keys = append(keys, id)
+	}
+	sort.Strings(keys)
+	infos := make([]map[string]any, 0, len(keys))
+	for _, id := range keys {
+		entry := r.entries[id]
 		infos = append(infos, map[string]any{
 			"id":      entry.ID,
 			"name":    entry.Name,
