@@ -1,5 +1,6 @@
-import { useMemo } from "react"
+import { useCallback, useMemo } from "react"
 
+import { agents } from "../../../../wailsjs/go/models"
 import { useAgentStream } from "@/features/streams/hooks/useAgentStream"
 import { threadToListItem } from "@/domain/threads"
 import { platformBridge } from "@/platform/wailsBridge"
@@ -46,7 +47,7 @@ export function useStreamLifecycle(options: StreamLifecycleOptions) {
     pendingAttachmentsRef
   } = options
 
-  const { startStream, cancelStream, getThreadState, threadStates } = useAgentStream({
+  const { startStream: baseStartStream, cancelStream, getThreadState, threadStates } = useAgentStream({
     onEvent: (event, context) => {
       const targetThreadId = context.threadId ?? activeThreadId ?? undefined
       if (!targetThreadId) {
@@ -134,6 +135,15 @@ export function useStreamLifecycle(options: StreamLifecycleOptions) {
     }
     return getThreadState(undefined)
   }, [activeThreadId, getThreadState, threadStates])
+
+  const startStream = useCallback(
+    async (payload: agents.MessageRequest) => {
+      const handle = await baseStartStream(payload)
+      resetAgentEntries(handle.threadId)
+      return handle
+    },
+    [baseStartStream, resetAgentEntries]
+  )
 
   return {
     startStream,
